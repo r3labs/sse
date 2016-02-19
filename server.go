@@ -13,6 +13,7 @@ const (
 // Server ...
 type Server struct {
 	BufferSize       int
+	DefaultStream    bool
 	streams          map[string]*Stream
 	registerStream   chan StreamRegistration
 	deregisterStream chan string
@@ -23,6 +24,7 @@ type Server struct {
 func NewServer() *Server {
 	return &Server{
 		BufferSize:       DefaultBufferSize,
+		DefaultStream:    false,
 		streams:          make(map[string]*Stream),
 		registerStream:   make(chan StreamRegistration),
 		deregisterStream: make(chan string),
@@ -92,6 +94,7 @@ func (s *Server) HTTPHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Streaming unsupported!", http.StatusInternalServerError)
 		return
 	}
+
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")

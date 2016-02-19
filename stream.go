@@ -29,7 +29,7 @@ func NewStream(bufsize int) *Stream {
 // NewSubscriber will create a new subscriber on a stream
 func (str *Stream) NewSubscriber() *Subscriber {
 	sub := &Subscriber{
-		Quit:       str.deregister,
+		quit:       str.deregister,
 		Connection: make(chan []byte),
 	}
 
