@@ -1,14 +1,18 @@
 package sse
 
-import "fmt"
-
 // Stream ...
 type Stream struct {
 	subscribers []*Subscriber
 	register    chan *Subscriber
-	unregister  chan *Subscriber
+	deregister  chan *Subscriber
 	event       chan []byte
 	quit        chan bool
+}
+
+// StreamRegistration ...
+type StreamRegistration struct {
+	id     string
+	stream *Stream
 }
 
 // NewStream returns a new stream
@@ -16,7 +20,7 @@ func NewStream(bufsize int) *Stream {
 	return &Stream{
 		subscribers: make([]*Subscriber, 0),
 		register:    make(chan *Subscriber),
-		unregister:  make(chan *Subscriber),
+		deregister:  make(chan *Subscriber),
 		event:       make(chan []byte, bufsize),
 		quit:        make(chan bool),
 	}
@@ -25,7 +29,7 @@ func NewStream(bufsize int) *Stream {
 // NewSubscriber will create a new subscriber on a stream
 func (str *Stream) NewSubscriber() *Subscriber {
 	sub := &Subscriber{
-		Quit:       str.unregister,
+		Quit:       str.deregister,
 		Connection: make(chan []byte),
 	}
 
@@ -41,14 +45,13 @@ func (str *Stream) Publish(event []byte) {
 func (str *Stream) run() {
 	go func(str *Stream) {
 		for {
-			fmt.Println(len(str.subscribers))
 			select {
 			// Add new subscriber
 			case subscriber := <-str.register:
 				str.subscribers = append(str.subscribers, subscriber)
 
 			// Remove closed subscriber
-			case subscriber := <-str.unregister:
+			case subscriber := <-str.deregister:
 				i := str.getSubIndex(subscriber)
 				if i != -1 {
 					str.removeSubscriber(i)
@@ -56,9 +59,7 @@ func (str *Stream) run() {
 
 			// Publish event to subscribers
 			case event := <-str.event:
-				fmt.Println("got event!")
 				for i := range str.subscribers {
-					fmt.Printf("publishing to subscriber %d\n", i)
 					str.subscribers[i].Connection <- event
 				}
 
