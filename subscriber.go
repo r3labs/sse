@@ -3,10 +3,10 @@ package sse
 // Subscriber ...
 type Subscriber struct {
 	quit       chan *Subscriber
-	Connection chan []byte
+	connection chan []byte
 }
 
 // Close will let the stream know that the clients connection has terminated
-func (s *Subscriber) Close() {
+func (s *Subscriber) close() {
 	s.quit <- s
 }

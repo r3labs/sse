@@ -30,7 +30,7 @@ func newStream(bufsize int) *Stream {
 func (str *Stream) addSubscriber() *Subscriber {
 	sub := &Subscriber{
 		quit:       str.deregister,
-		Connection: make(chan []byte, 64),
+		connection: make(chan []byte, 64),
 	}
 
 	str.register <- sub
@@ -55,15 +55,13 @@ func (str *Stream) run() {
 			// Publish event to subscribers
 			case event := <-str.event:
 				for i := range str.subscribers {
-					str.subscribers[i].Connection <- event
+					str.subscribers[i].connection <- event
 				}
 
 			// Shutdown if the server closes
 			case <-str.quit:
 				// remove connections
-				for i := range str.subscribers {
-					str.removeSubscriber(i)
-				}
+				str.removeAllSubscribers()
 				return
 			}
 		}
@@ -84,6 +82,13 @@ func (str *Stream) getSubIndex(sub *Subscriber) int {
 }
 
 func (str *Stream) removeSubscriber(i int) {
-	close(str.subscribers[i].Connection)
+	close(str.subscribers[i].connection)
 	str.subscribers = append(str.subscribers[:i], str.subscribers[i+1:]...)
+}
+
+func (str *Stream) removeAllSubscribers() {
+	for i := 0; i < len(str.subscribers); i++ {
+		close(str.subscribers[i].connection)
+	}
+	str.subscribers = str.subscribers[:0]
 }

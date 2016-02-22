@@ -1,28 +1,22 @@
 package sse
 
-import (
-	"fmt"
-	"net/http"
-	"sync"
-)
+import "sync"
 
 // DefaultBufferSize size of the queue that holds the streams messages.
 const DefaultBufferSize = 1024
 
 // Server ...
 type Server struct {
-	BufferSize    int
-	DefaultStream bool
-	streams       map[string]*Stream
-	mu            sync.Mutex
+	BufferSize int
+	streams    map[string]*Stream
+	mu         sync.Mutex
 }
 
 // New will create a server and setup defaults
 func New() *Server {
 	return &Server{
-		BufferSize:    DefaultBufferSize,
-		DefaultStream: false,
-		streams:       make(map[string]*Stream),
+		BufferSize: DefaultBufferSize,
+		streams:    make(map[string]*Stream),
 	}
 }
 
@@ -71,38 +65,4 @@ func (s *Server) getStream(id string) *Stream {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.streams[id]
-}
-
-// HTTPHandler serves new connections with events for a given stream ...
-func (s *Server) HTTPHandler(w http.ResponseWriter, r *http.Request) {
-	flusher, err := w.(http.Flusher)
-	if !err {
-		http.Error(w, "Streaming unsupported!", http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Connection", "keep-alive")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-
-	// Get the StreamID from
-	streamID := r.URL.Query().Get("streamID")
-	sub := s.getStream(streamID).addSubscriber()
-	defer sub.Close()
-
-	if streamID == "" && !s.DefaultStream {
-		http.Error(w, "Stream not found!", http.StatusInternalServerError)
-		return
-	}
-
-	notify := w.(http.CloseNotifier).CloseNotify()
-	go func() {
-		<-notify
-		sub.Close()
-	}()
-	for {
-		fmt.Fprintf(w, "data: %s\n\n", <-sub.Connection)
-		flusher.Flush()
-	}
 }
