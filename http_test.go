@@ -1,31 +1,23 @@
 package sse
 
 import (
-	"errors"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
 	. "github.com/smartystreets/goconvey/convey"
 )
 
-func wait(ch chan []byte, duration time.Duration) ([]byte, error) {
-	var err error
-	var msg []byte
-
-	select {
-	case event := <-ch:
-		msg = event
-	case <-time.After(duration):
-		err = errors.New("timeout")
-	}
-	return msg, err
-}
-
-func TestServer(t *testing.T) {
+func TestHTTP(t *testing.T) {
 	// New Server
 	s := New()
 
-	Convey("Given a new server", t, func() {
+	mux := http.NewServeMux()
+	server := httptest.NewTLSServer(mux)
+	defer server.Close()
+
+	Convey("Given a new http Handler", t, func() {
 		Convey("When creating a new stream", func() {
 			s.CreateStream("test")
 

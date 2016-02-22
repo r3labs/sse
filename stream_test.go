@@ -7,6 +7,9 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 )
 
+// Tests are accessing subscriber in a non-threadsafe way.
+// Maybe fix this in the future so we can test with -race enabled
+
 func TestStream(t *testing.T) {
 	Convey("Given a new stream", t, func() {
 		// New Stream
