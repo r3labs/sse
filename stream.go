@@ -15,8 +15,8 @@ type StreamRegistration struct {
 	stream *Stream
 }
 
-// NewStream returns a new stream
-func NewStream(bufsize int) *Stream {
+// newStream returns a new stream
+func newStream(bufsize int) *Stream {
 	return &Stream{
 		subscribers: make([]*Subscriber, 0),
 		register:    make(chan *Subscriber),
@@ -26,20 +26,15 @@ func NewStream(bufsize int) *Stream {
 	}
 }
 
-// NewSubscriber will create a new subscriber on a stream
-func (str *Stream) NewSubscriber() *Subscriber {
+// addSubscriber will create a new subscriber on a stream
+func (str *Stream) addSubscriber() *Subscriber {
 	sub := &Subscriber{
 		quit:       str.deregister,
-		Connection: make(chan []byte),
+		Connection: make(chan []byte, 64),
 	}
 
 	str.register <- sub
 	return sub
-}
-
-// Publish sends an event to all subcribers of a stream
-func (str *Stream) Publish(event []byte) {
-	str.event <- event
 }
 
 func (str *Stream) run() {

@@ -3,87 +3,73 @@ package sse
 import (
 	"fmt"
 	"net/http"
+	"sync"
 )
 
-const (
-	// DefaultBufferSize size of the queue that holds the streams messages.
-	DefaultBufferSize = 1024
-)
+// DefaultBufferSize size of the queue that holds the streams messages.
+const DefaultBufferSize = 1024
 
 // Server ...
 type Server struct {
-	BufferSize       int
-	DefaultStream    bool
-	streams          map[string]*Stream
-	registerStream   chan StreamRegistration
-	deregisterStream chan string
-	quit             chan bool
+	BufferSize    int
+	DefaultStream bool
+	streams       map[string]*Stream
+	mu            sync.Mutex
 }
 
-// NewServer will create a server and setup defaults
-func NewServer() *Server {
+// New will create a server and setup defaults
+func New() *Server {
 	return &Server{
-		BufferSize:       DefaultBufferSize,
-		DefaultStream:    false,
-		streams:          make(map[string]*Stream),
-		registerStream:   make(chan StreamRegistration),
-		deregisterStream: make(chan string),
-		quit:             make(chan bool),
+		BufferSize:    DefaultBufferSize,
+		DefaultStream: false,
+		streams:       make(map[string]*Stream),
 	}
-}
-
-// Start the server's internal messaging
-func (s *Server) Start() {
-	go func(s *Server) {
-		for {
-			select {
-			// Add new streams
-			case reg := <-s.registerStream:
-				s.streams[reg.id] = reg.stream
-				s.streams[reg.id].run()
-
-			// Remove old streams
-			case id := <-s.deregisterStream:
-				s.streams[id].close()
-				delete(s.streams, id)
-
-			// Close all streams
-			case <-s.quit:
-				for id := range s.streams {
-					s.streams[id].quit <- true
-					delete(s.streams, id)
-				}
-				return
-			}
-		}
-	}(s)
 }
 
 // Close shuts down the server, closes all of the streams and connections
 func (s *Server) Close() {
-	s.quit <- true
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for id := range s.streams {
+		s.streams[id].quit <- true
+		delete(s.streams, id)
+	}
 }
 
-// CreateStream will add a new stream
+// CreateStream will create a new stream and register it
 func (s *Server) CreateStream(id string) *Stream {
-	sr := StreamRegistration{
-		id:     id,
-		stream: NewStream(s.BufferSize),
-	}
-	s.registerStream <- sr
+	str := newStream(s.BufferSize)
+	str.run()
 
-	return sr.stream
+	// Register new stream
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.streams[id] = str
+
+	return str
 }
 
 // RemoveStream will remove a stream
 func (s *Server) RemoveStream(id string) {
-	s.deregisterStream <- id
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.streams[id].close()
+	delete(s.streams, id)
 }
 
-// GetStream returns a stream entity based on its id
-func (s *Server) GetStream(id string) *Stream {
-	// Hashmap is unsafe, might cause race if register/deregister
-	// is run at the same time
+// Publish sends a mesage to every client in a streamID// Publish sends an event to all subcribers of a stream
+func (s *Server) Publish(id string, event []byte) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.streams[id].event <- event
+}
+
+func (s *Server) getStream(id string) *Stream {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	return s.streams[id]
 }
 
@@ -102,15 +88,13 @@ func (s *Server) HTTPHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Get the StreamID from
 	streamID := r.URL.Query().Get("streamID")
+	sub := s.getStream(streamID).addSubscriber()
+	defer sub.Close()
 
-	stream := s.GetStream(streamID)
-	if stream == nil {
+	if streamID == "" && !s.DefaultStream {
 		http.Error(w, "Stream not found!", http.StatusInternalServerError)
 		return
 	}
-
-	sub := stream.NewSubscriber()
-	defer sub.Close()
 
 	notify := w.(http.CloseNotifier).CloseNotify()
 	go func() {
@@ -118,10 +102,7 @@ func (s *Server) HTTPHandler(w http.ResponseWriter, r *http.Request) {
 		sub.Close()
 	}()
 	for {
-		// Write to the ResponseWriter
-		// Server Sent Events compatible
 		fmt.Fprintf(w, "data: %s\n\n", <-sub.Connection)
-		// Flush the data immediatly instead of buffering it for later.
 		flusher.Flush()
 	}
 }
