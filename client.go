@@ -3,7 +3,6 @@ package sse
 import (
 	"bufio"
 	"bytes"
-	"fmt"
 	"net/http"
 )
 
@@ -96,11 +95,7 @@ func (c *Client) request(stream string) (*http.Response, error) {
 func processEvent(msg []byte) *Event {
 	e := Event{}
 
-	if len(msg) < 6 {
-		return &e
-	}
-
-	switch h := msg[:6]; {
+	switch h := msg; {
 	case bytes.Contains(h, headerID):
 		e.ID = trimHeader(len(headerID), msg)
 	case bytes.Contains(h, headerData):
@@ -109,8 +104,6 @@ func processEvent(msg []byte) *Event {
 		e.Event = trimHeader(len(headerEvent), msg)
 	case bytes.Contains(h, headerError):
 		e.Error = trimHeader(len(headerError), msg)
-	default:
-		fmt.Println(bytes.Contains(h, headerData))
 	}
 	return &e
 }
