@@ -2,6 +2,7 @@ package sse
 
 // Stream ...
 type Stream struct {
+	stats       chan chan int
 	subscribers []*Subscriber
 	register    chan *Subscriber
 	deregister  chan *Subscriber
