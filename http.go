@@ -39,7 +39,13 @@ func (s *Server) HTTPHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Push events to client
 	for {
-		fmt.Fprintf(w, "data: %s\n\n", <-sub.connection)
-		flusher.Flush()
+		select {
+		case data, ok := <-sub.connection:
+			if !ok {
+				return
+			}
+			fmt.Fprintf(w, "data: %s\n\n", data)
+			flusher.Flush()
+		}
 	}
 }

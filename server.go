@@ -58,7 +58,9 @@ func (s *Server) RemoveStream(id string) {
 func (s *Server) Publish(id string, event []byte) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.streams[id].event <- event
+	if s.streams[id] != nil {
+		s.streams[id].event <- event
+	}
 }
 
 func (s *Server) getStream(id string) *Stream {
