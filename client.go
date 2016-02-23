@@ -70,6 +70,11 @@ func (c *Client) request(stream string) (*http.Response, error) {
 
 func processEvent(msg []byte) *Event {
 	e := Event{}
+
+	if len(msg) < 6 {
+		return &e
+	}
+
 	switch h := msg[:6]; {
 	case bytes.Contains(h, headerID):
 		e.ID = trimHeader(len(headerID), msg)
