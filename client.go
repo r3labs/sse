@@ -3,6 +3,7 @@ package sse
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"net/http"
 )
 
@@ -28,7 +29,7 @@ func NewClient(url string) *Client {
 }
 
 // Subscribe to a data stream
-func (c *Client) Subscribe(stream string, handler func(msg []byte)) error {
+func (c *Client) Subscribe(stream string, handler func(msg *Event)) error {
 	resp, err := c.request(stream)
 	if err != nil {
 		return err
@@ -40,14 +41,12 @@ func (c *Client) Subscribe(stream string, handler func(msg []byte)) error {
 	for {
 		// Read each new line and process the type of event
 		line, err := reader.ReadBytes('\n')
-		msg := processEvent(line)
 		if err != nil {
 			return err
 		}
-
-		// If we have data, pass it to the handler
-		if msg.Data != nil {
-			handler(msg.Data)
+		msg := processEvent(line)
+		if msg != nil {
+			handler(msg)
 		}
 	}
 }
@@ -59,7 +58,10 @@ func (c *Client) request(stream string) (*http.Response, error) {
 	}
 
 	// Setup request, specify stream to connect to
-	req.URL.Query().Add("stream", stream)
+	query := req.URL.Query()
+	query.Add("stream", stream)
+	req.URL.RawQuery = query.Encode()
+
 	req.Header.Set("Cache-Control", "no-cache")
 	req.Header.Set("Accept", "text/event-stream")
 	req.Header.Set("Connection", "keep-alive")
@@ -84,10 +86,21 @@ func processEvent(msg []byte) *Event {
 		e.Event = trimHeader(len(headerEvent), msg)
 	case bytes.Contains(h, headerError):
 		e.Error = trimHeader(len(headerError), msg)
+	default:
+		fmt.Println(bytes.Contains(h, headerData))
 	}
 	return &e
 }
 
 func trimHeader(size int, data []byte) []byte {
-	return []byte{}
+	data = data[size:]
+	// Remove optional leading whitespace
+	if data[0] == 32 {
+		data = data[1:]
+	}
+	// Remove trailing new line
+	if data[len(data)-1] == 10 {
+		data = data[:len(data)-1]
+	}
+	return data
 }

@@ -1,7 +1,6 @@
 package sse
 
 import (
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -13,23 +12,12 @@ import (
 func TestHTTP(t *testing.T) {
 	// New Server
 	s := New()
-	s.CreateStream("test")
-
-	go func(s *Server) {
-		for {
-			s.Publish("test", []byte("ping"))
-			time.Sleep(time.Second * 1)
-		}
-	}(s)
+	defer s.Close()
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/events", s.HTTPHandler)
 
 	server := httptest.NewServer(mux)
-	defer server.Close()
-	fmt.Println(server.URL)
-
-	time.Sleep(time.Minute * 2)
 
 	Convey("Given a new http Handler", t, func() {
 		s.CreateStream("test")
@@ -37,15 +25,21 @@ func TestHTTP(t *testing.T) {
 		Convey("When creating a new stream", func() {
 			c := NewClient(server.URL + "/events")
 
-			Convey("It should publish events to its subscribers", func() {
+			Convey("It should publish events to its subscriber", func() {
 				events := make(chan []byte)
-				go c.Subscribe("test", func(msg []byte) {
-					fmt.Println(string(msg))
-					events <- msg
-				})
+				var cErr error
+				go func(cErr error) {
+					cErr = c.Subscribe("test", func(msg *Event) {
+						if msg.Data != nil {
+							events <- msg.Data
+							return
+						}
+					})
+				}(cErr)
 
-				time.Sleep(time.Millisecond * 100)
-
+				// Wait for subscriber to be registered and message to be published
+				time.Sleep(time.Millisecond * 200)
+				So(cErr, ShouldBeNil)
 				s.Publish("test", []byte("test"))
 
 				msg, err := wait(events, time.Millisecond*500)
@@ -55,5 +49,4 @@ func TestHTTP(t *testing.T) {
 
 		})
 	})
-
 }
