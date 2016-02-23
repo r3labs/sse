@@ -1,5 +1,5 @@
 language: go
 go:
-  - tip
+  - 1.5
 install: make deps
 script: make test

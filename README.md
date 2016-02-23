@@ -1,5 +1,7 @@
 # SSE - Server Side Events Client/Server Library for Go
 
+[![Build Status](https://travis-ci.org/purehyperbole/sse.svg?branch=master)](https://travis-ci.org/purehyperbole/sse)
+
 ## Introduction
 
 SSE is a client/server implementation for Server Side Events for Golang. Right now functionality is basic, but there is support for multiple separate streams with many clients connected to each. The client is able to specify the stream it wants to connect to by the URL parameter _stream_.
