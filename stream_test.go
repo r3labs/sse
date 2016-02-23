@@ -1,6 +1,7 @@
 package sse
 
 import (
+	"sync"
 	"testing"
 	"time"
 
@@ -9,6 +10,16 @@ import (
 
 // Tests are accessing subscriber in a non-threadsafe way.
 // Maybe fix this in the future so we can test with -race enabled
+
+// This is used because we access a stream's subscribers in an unsafe way.
+// This isn't exposed publicly, so we define the mutex here
+var mu sync.Mutex
+
+func getSubCount(s *Stream) int {
+	mu.Lock()
+	defer mu.Unlock()
+	return len(s.subscribers)
+}
 
 func TestStream(t *testing.T) {
 	Convey("Given a new stream", t, func() {
@@ -20,7 +31,7 @@ func TestStream(t *testing.T) {
 			sub := s.addSubscriber()
 
 			Convey("It should be stored", func() {
-				So(len(s.subscribers), ShouldEqual, 1)
+				So(getSubCount(s), ShouldEqual, 1)
 			})
 			Convey("It should receive messages", func() {
 				s.event <- []byte("test")
@@ -35,7 +46,7 @@ func TestStream(t *testing.T) {
 			s.addSubscriber()
 			s.removeSubscriber(0)
 			Convey("It should be removed from the list of subscribers", func() {
-				So(len(s.subscribers), ShouldEqual, 0)
+				So(getSubCount(s), ShouldEqual, 0)
 			})
 		})
 
@@ -44,7 +55,7 @@ func TestStream(t *testing.T) {
 			sub.close()
 			time.Sleep(time.Millisecond * 100)
 			Convey("It should be removed from the list of subscribers", func() {
-				So(len(s.subscribers), ShouldEqual, 0)
+				So(getSubCount(s), ShouldEqual, 0)
 			})
 		})
 
@@ -72,7 +83,7 @@ func TestStream(t *testing.T) {
 				// Wait for all subscribers to close
 				time.Sleep(time.Millisecond * 100)
 
-				So(len(s.subscribers), ShouldEqual, 0)
+				So(getSubCount(s), ShouldEqual, 0)
 			})
 
 		})

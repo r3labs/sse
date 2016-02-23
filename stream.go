@@ -26,17 +26,6 @@ func newStream(bufsize int) *Stream {
 	}
 }
 
-// addSubscriber will create a new subscriber on a stream
-func (str *Stream) addSubscriber() *Subscriber {
-	sub := &Subscriber{
-		quit:       str.deregister,
-		connection: make(chan []byte, 64),
-	}
-
-	str.register <- sub
-	return sub
-}
-
 func (str *Stream) run() {
 	go func(str *Stream) {
 		for {
@@ -79,6 +68,17 @@ func (str *Stream) getSubIndex(sub *Subscriber) int {
 		}
 	}
 	return -1
+}
+
+// addSubscriber will create a new subscriber on a stream
+func (str *Stream) addSubscriber() *Subscriber {
+	sub := &Subscriber{
+		quit:       str.deregister,
+		connection: make(chan []byte, 64),
+	}
+
+	str.register <- sub
+	return sub
 }
 
 func (str *Stream) removeSubscriber(i int) {

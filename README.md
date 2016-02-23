@@ -41,6 +41,12 @@ func main() {
 ```
 
 This creates a new stream inside of the scheduler. Seeing as there are no consumers, publishing a message to this channel will do nothing.
+Clients can connect to this stream once the http handler is started by specifying _stream_ as a url parameter, like so:
+
+```
+http://server/events?stream=messages
+```
+
 
 In order to start the http server:
 
