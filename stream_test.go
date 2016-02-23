@@ -33,7 +33,9 @@ func TestStream(t *testing.T) {
 
 		Convey("When removing a subscriber", func() {
 			s.addSubscriber()
+			time.Sleep(time.Millisecond * 100)
 			s.removeSubscriber(0)
+
 			Convey("It should be removed from the list of subscribers", func() {
 				So(len(s.subscribers), ShouldEqual, 0)
 			})
@@ -43,6 +45,7 @@ func TestStream(t *testing.T) {
 			sub := s.addSubscriber()
 			sub.close()
 			time.Sleep(time.Millisecond * 100)
+
 			Convey("It should be removed from the list of subscribers", func() {
 				So(len(s.subscribers), ShouldEqual, 0)
 			})
