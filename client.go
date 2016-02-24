@@ -17,6 +17,7 @@ var (
 type Client struct {
 	URL        string
 	Connection *http.Client
+	Headers    map[string]string
 }
 
 // NewClient creates a new client
@@ -89,8 +90,12 @@ func (c *Client) request(stream string) (*http.Response, error) {
 	req.Header.Set("Accept", "text/event-stream")
 	req.Header.Set("Connection", "keep-alive")
 
-	resp, err := c.Connection.Do(req)
-	return resp, nil
+	// Add user specified headers
+	for k, v := range c.Headers {
+		req.Header.Set(k, v)
+	}
+
+	return c.Connection.Do(req)
 }
 
 func processEvent(msg []byte) *Event {
