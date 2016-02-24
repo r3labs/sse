@@ -54,6 +54,17 @@ func (s *Server) RemoveStream(id string) {
 	delete(s.streams, id)
 }
 
+// StreamExists checks whether a stream by a given id exists
+func (s *Server) StreamExists(id string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.streams[id] != nil {
+		return true
+	}
+	return false
+}
+
 // Publish sends a mesage to every client in a streamID// Publish sends an event to all subcribers of a stream
 func (s *Server) Publish(id string, event []byte) {
 	s.mu.Lock()

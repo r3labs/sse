@@ -64,6 +64,7 @@ func (c *Client) SubscribeChan(stream string, ch chan *Event) error {
 		// Read each new line and process the type of event
 		line, err := reader.ReadBytes('\n')
 		if err != nil {
+			close(ch)
 			return err
 		}
 		msg := processEvent(line)
@@ -93,7 +94,7 @@ func (c *Client) request(stream string) (*http.Response, error) {
 }
 
 func processEvent(msg []byte) *Event {
-	e := Event{}
+	var e Event
 
 	switch h := msg; {
 	case bytes.Contains(h, headerID):
@@ -104,6 +105,8 @@ func processEvent(msg []byte) *Event {
 		e.Event = trimHeader(len(headerEvent), msg)
 	case bytes.Contains(h, headerError):
 		e.Error = trimHeader(len(headerError), msg)
+	default:
+		return nil
 	}
 	return &e
 }
