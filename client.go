@@ -25,6 +25,7 @@ func NewClient(url string) *Client {
 	return &Client{
 		URL:        url,
 		Connection: &http.Client{},
+		Headers:    make(map[string]string),
 	}
 }
 
