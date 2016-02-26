@@ -37,16 +37,16 @@ func (s *Server) Close() {
 
 // CreateStream will create a new stream and register it
 func (s *Server) CreateStream(id string) *Stream {
-	if s.StreamExists(id) {
-		return s.getStream(id)
-	}
-
 	str := newStream(s.BufferSize)
 	str.run()
 
 	// Register new stream
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	if s.streams[id] != nil {
+		return s.streams[id]
+	}
 
 	s.streams[id] = str
 
