@@ -37,6 +37,10 @@ func (s *Server) Close() {
 
 // CreateStream will create a new stream and register it
 func (s *Server) CreateStream(id string) *Stream {
+	if s.StreamExists(id) {
+		return s.getStream(id)
+	}
+
 	str := newStream(s.BufferSize)
 	str.run()
 
