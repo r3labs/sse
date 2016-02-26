@@ -5,9 +5,12 @@ import "sync"
 // DefaultBufferSize size of the queue that holds the streams messages.
 const DefaultBufferSize = 1024
 
-// Server ...
+// Server Is our main struct
 type Server struct {
+	// Specifies the size of the message buffer for each stream
 	BufferSize int
+	// Enables creation of a stream when a client connects
+	AutoStream bool
 	streams    map[string]*Stream
 	mu         sync.Mutex
 }
@@ -16,6 +19,7 @@ type Server struct {
 func New() *Server {
 	return &Server{
 		BufferSize: DefaultBufferSize,
+		AutoStream: false,
 		streams:    make(map[string]*Stream),
 	}
 }
