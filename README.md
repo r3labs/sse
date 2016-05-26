@@ -1,6 +1,6 @@
 # SSE - Server Side Events Client/Server Library for Go
 
-[![Build Status](https://travis-ci.org/carrenza/sse.svg?branch=master)](https://travis-ci.org/carrenza/sse)
+[![Build Status](https://travis-ci.org/r3labs/sse.svg?branch=master)](https://travis-ci.org/r3labs/sse)
 
 ## Introduction
 
