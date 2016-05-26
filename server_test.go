@@ -36,12 +36,19 @@ func TestServer(t *testing.T) {
 			})
 		})
 
-		Convey("When removing a stream", func() {
+		Convey("When removing a stream that exists", func() {
 			s.CreateStream("test")
 			s.RemoveStream("test")
 
 			Convey("It should be removed", func() {
 				So(s.getStream("test"), ShouldBeNil)
+			})
+		})
+
+
+		Convey("When removing a stream that doesn't exist", func() {
+			Convey("It should not panic", func() {
+				So(func() { s.RemoveStream("test") }, ShouldNotPanic)
 			})
 		})
 

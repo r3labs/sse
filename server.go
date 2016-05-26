@@ -58,8 +58,10 @@ func (s *Server) RemoveStream(id string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.streams[id].close()
-	delete(s.streams, id)
+	if s.streams[id] != nil {
+		s.streams[id].close()
+		delete(s.streams, id)
+	}
 }
 
 // StreamExists checks whether a stream by a given id exists
