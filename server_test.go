@@ -1,3 +1,7 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
 package sse
 
 import (
@@ -44,7 +48,6 @@ func TestServer(t *testing.T) {
 				So(s.getStream("test"), ShouldBeNil)
 			})
 		})
-
 
 		Convey("When removing a stream that doesn't exist", func() {
 			Convey("It should not panic", func() {
