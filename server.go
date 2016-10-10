@@ -100,7 +100,7 @@ func (s *Server) getStream(id string) *Stream {
 
 func (s *Server) process(event []byte) []byte {
 	if s.EncodeBase64 {
-		var output []byte
+		output := make([]byte, base64.StdEncoding.EncodedLen(len(event)))
 		base64.StdEncoding.Encode(output, event)
 		return output
 	}

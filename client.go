@@ -123,7 +123,7 @@ func (c *Client) processEvent(msg []byte) *Event {
 	}
 
 	if len(e.Data) > 0 && c.EncodingBase64 {
-		var buf []byte
+		buf := make([]byte, base64.StdEncoding.DecodedLen(len(e.Data)))
 
 		_, err := base64.StdEncoding.Decode(buf, e.Data)
 		if err != nil {
