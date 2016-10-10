@@ -4,7 +4,10 @@
 
 package sse
 
-import "sync"
+import (
+	"encoding/base64"
+	"sync"
+)
 
 // DefaultBufferSize size of the queue that holds the streams messages.
 const DefaultBufferSize = 1024
@@ -14,9 +17,10 @@ type Server struct {
 	// Specifies the size of the message buffer for each stream
 	BufferSize int
 	// Enables creation of a stream when a client connects
-	AutoStream bool
-	streams    map[string]*Stream
-	mu         sync.Mutex
+	AutoStream   bool
+	EncodeBase64 bool
+	streams      map[string]*Stream
+	mu           sync.Mutex
 }
 
 // New will create a server and setup defaults
@@ -79,12 +83,12 @@ func (s *Server) StreamExists(id string) bool {
 	return false
 }
 
-// Publish sends a mesage to every client in a streamID// Publish sends an event to all subcribers of a stream
+// Publish sends a mesage to every client in a streamID
 func (s *Server) Publish(id string, event []byte) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.streams[id] != nil {
-		s.streams[id].event <- event
+		s.streams[id].event <- s.process(event)
 	}
 }
 
@@ -92,4 +96,13 @@ func (s *Server) getStream(id string) *Stream {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.streams[id]
+}
+
+func (s *Server) process(event []byte) []byte {
+	if s.EncodeBase64 {
+		var output []byte
+		base64.StdEncoding.Encode(output, event)
+		return output
+	}
+	return event
 }

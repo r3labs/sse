@@ -7,6 +7,8 @@ package sse
 import (
 	"bufio"
 	"bytes"
+	"encoding/base64"
+	"log"
 	"net/http"
 )
 
@@ -19,9 +21,10 @@ var (
 
 // Client handles an incoming server stream
 type Client struct {
-	URL        string
-	Connection *http.Client
-	Headers    map[string]string
+	URL            string
+	Connection     *http.Client
+	Headers        map[string]string
+	EncodingBase64 bool
 }
 
 // NewClient creates a new client
@@ -49,7 +52,7 @@ func (c *Client) Subscribe(stream string, handler func(msg *Event)) error {
 		if err != nil {
 			return err
 		}
-		msg := processEvent(line)
+		msg := c.processEvent(line)
 		if msg != nil {
 			handler(msg)
 		}
@@ -73,7 +76,7 @@ func (c *Client) SubscribeChan(stream string, ch chan *Event) error {
 			close(ch)
 			return err
 		}
-		msg := processEvent(line)
+		msg := c.processEvent(line)
 		if msg != nil {
 			ch <- msg
 		}
@@ -103,7 +106,7 @@ func (c *Client) request(stream string) (*http.Response, error) {
 	return c.Connection.Do(req)
 }
 
-func processEvent(msg []byte) *Event {
+func (c *Client) processEvent(msg []byte) *Event {
 	var e Event
 
 	switch h := msg; {
@@ -118,6 +121,18 @@ func processEvent(msg []byte) *Event {
 	default:
 		return nil
 	}
+
+	if len(e.Data) > 0 && c.EncodingBase64 {
+		var buf []byte
+
+		_, err := base64.StdEncoding.Decode(buf, e.Data)
+		if err != nil {
+			log.Println(err)
+		}
+
+		e.Data = buf
+	}
+
 	return &e
 }
 
