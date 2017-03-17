@@ -63,6 +63,7 @@ func (c *Client) Subscribe(stream string, handler func(msg *Event)) error {
 func (c *Client) SubscribeChan(stream string, ch chan *Event) error {
 	resp, err := c.request(stream)
 	if err != nil {
+		close(ch)
 		return err
 	}
 	defer resp.Body.Close()
