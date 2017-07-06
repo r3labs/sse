@@ -29,7 +29,7 @@ func setup() {
 	// Send continuous string of events to the client
 	go func(s *Server) {
 		for {
-			s.Publish("test", []byte("ping"))
+			s.Publish("test", &Event{Data: []byte("ping")})
 			time.Sleep(time.Millisecond * 500)
 		}
 	}(s)
@@ -42,12 +42,12 @@ func TestClient(t *testing.T) {
 
 		Convey("When connecting to a new stream", func() {
 			Convey("It should receive events ", func() {
-				events := make(chan []byte)
+				events := make(chan *Event)
 				var cErr error
 				go func(cErr error) {
 					cErr = c.Subscribe("test", func(msg *Event) {
 						if msg.Data != nil {
-							events <- msg.Data
+							events <- msg
 							return
 						}
 					})

@@ -25,6 +25,7 @@ type Client struct {
 	Connection     *http.Client
 	Headers        map[string]string
 	EncodingBase64 bool
+	EventID        string
 }
 
 // NewClient creates a new client
@@ -98,6 +99,10 @@ func (c *Client) request(stream string) (*http.Response, error) {
 	req.Header.Set("Cache-Control", "no-cache")
 	req.Header.Set("Accept", "text/event-stream")
 	req.Header.Set("Connection", "keep-alive")
+
+	if c.EventID != "" {
+		req.Header.Set("Last-Event-ID", c.EventID)
+	}
 
 	// Add user specified headers
 	for k, v := range c.Headers {

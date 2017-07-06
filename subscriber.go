@@ -6,8 +6,9 @@ package sse
 
 // Subscriber ...
 type Subscriber struct {
+	eventid    string
 	quit       chan *Subscriber
-	connection chan []byte
+	connection chan *Event
 }
 
 // Close will let the stream know that the clients connection has terminated
