@@ -40,6 +40,7 @@ func (str *Stream) run() {
 			// Add new subscriber
 			case subscriber := <-str.register:
 				str.subscribers = append(str.subscribers, subscriber)
+				str.eventlog.Replay(subscriber)
 
 			// Remove closed subscriber
 			case subscriber := <-str.deregister:

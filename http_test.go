@@ -7,6 +7,7 @@ package sse
 import (
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"testing"
 	"time"
 
@@ -21,15 +22,15 @@ func TestHTTP(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/events", s.HTTPHandler)
 
-	server := httptest.NewServer(mux)
-
 	Convey("Given a new http Handler", t, func() {
-		s.CreateStream("test")
+		server := httptest.NewServer(mux)
 
 		Convey("When creating a new stream", func() {
-			c := NewClient(server.URL + "/events")
+			s.CreateStream("test")
 
 			Convey("It should publish events to its subscriber", func() {
+				c := NewClient(server.URL + "/events")
+
 				events := make(chan *Event)
 				var cErr error
 				go func(cErr error) {
@@ -52,5 +53,69 @@ func TestHTTP(t *testing.T) {
 			})
 
 		})
+
+		Convey("When creating a new stream with existing events", func() {
+			s.CreateStream("test2")
+			defer s.RemoveStream("test2")
+
+			s.Publish("test2", &Event{Data: []byte("test 1")})
+			s.Publish("test2", &Event{Data: []byte("test 2")})
+			s.Publish("test2", &Event{Data: []byte("test 3")})
+			time.Sleep(time.Millisecond * 100)
+
+			Convey("And eventid is not specified", func() {
+				Convey("It should publish all previous events to its subscriber", func() {
+					var cErr error
+
+					c := NewClient(server.URL + "/events")
+
+					events := make(chan *Event)
+
+					go func(cErr error) {
+						cErr = c.Subscribe("test2", func(msg *Event) {
+							if len(msg.Data) > 0 {
+								events <- msg
+							}
+						})
+					}(cErr)
+
+					So(cErr, ShouldBeNil)
+
+					for i := 1; i <= 3; i++ {
+						msg, err := wait(events, time.Millisecond*500)
+						So(err, ShouldBeNil)
+						So(string(msg), ShouldEqual, "test "+strconv.Itoa(i))
+					}
+				})
+			})
+
+			Convey("And eventid is specified", func() {
+				Convey("It should publish all events after eventid to its subscriber", func() {
+					var cErr error
+
+					c := NewClient(server.URL + "/events")
+					c.EventID = "2"
+
+					events := make(chan *Event)
+
+					go func(cErr error) {
+						cErr = c.Subscribe("test2", func(msg *Event) {
+							if len(msg.Data) > 0 {
+								events <- msg
+							}
+						})
+					}(cErr)
+
+					So(cErr, ShouldBeNil)
+
+					for i := 3; i <= 3; i++ {
+						msg, err := wait(events, time.Millisecond*500)
+						So(err, ShouldBeNil)
+						So(string(msg), ShouldEqual, "test "+strconv.Itoa(i))
+					}
+				})
+			})
+		})
+
 	})
 }
