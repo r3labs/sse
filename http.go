@@ -38,8 +38,13 @@ func (s *Server) HTTPHandler(w http.ResponseWriter, r *http.Request) {
 		stream = s.CreateStream(streamID)
 	}
 
+	eventid := r.Header.Get("Last-Event-ID")
+	if eventid == "" {
+		eventid = "0"
+	}
+
 	// Create the stream subscriber
-	sub := stream.addSubscriber()
+	sub := stream.addSubscriber(eventid)
 	defer sub.close()
 
 	notify := w.(http.CloseNotifier).CloseNotify()
@@ -51,11 +56,12 @@ func (s *Server) HTTPHandler(w http.ResponseWriter, r *http.Request) {
 	// Push events to client
 	for {
 		select {
-		case data, ok := <-sub.connection:
+		case ev, ok := <-sub.connection:
 			if !ok {
 				return
 			}
-			fmt.Fprintf(w, "data: %s\n", data)
+			fmt.Fprintf(w, "id: %s\n", ev.ID)
+			fmt.Fprintf(w, "data: %s\n", ev.Data)
 			flusher.Flush()
 		}
 	}

@@ -30,12 +30,12 @@ func TestHTTP(t *testing.T) {
 			c := NewClient(server.URL + "/events")
 
 			Convey("It should publish events to its subscriber", func() {
-				events := make(chan []byte)
+				events := make(chan *Event)
 				var cErr error
 				go func(cErr error) {
 					cErr = c.Subscribe("test", func(msg *Event) {
 						if msg.Data != nil {
-							events <- msg.Data
+							events <- msg
 							return
 						}
 					})
@@ -44,7 +44,7 @@ func TestHTTP(t *testing.T) {
 				// Wait for subscriber to be registered and message to be published
 				time.Sleep(time.Millisecond * 200)
 				So(cErr, ShouldBeNil)
-				s.Publish("test", []byte("test"))
+				s.Publish("test", &Event{Data: []byte("test")})
 
 				msg, err := wait(events, time.Millisecond*500)
 				So(err, ShouldBeNil)

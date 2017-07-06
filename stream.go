@@ -10,8 +10,9 @@ type Stream struct {
 	subscribers []*Subscriber
 	register    chan *Subscriber
 	deregister  chan *Subscriber
-	event       chan []byte
+	event       chan *Event
 	quit        chan bool
+	eventlog    EventLog
 }
 
 // StreamRegistration ...
@@ -26,8 +27,9 @@ func newStream(bufsize int) *Stream {
 		subscribers: make([]*Subscriber, 0),
 		register:    make(chan *Subscriber),
 		deregister:  make(chan *Subscriber),
-		event:       make(chan []byte, bufsize),
+		event:       make(chan *Event, bufsize),
 		quit:        make(chan bool),
+		eventlog:    make(EventLog, 0),
 	}
 }
 
@@ -48,6 +50,7 @@ func (str *Stream) run() {
 
 			// Publish event to subscribers
 			case event := <-str.event:
+				str.eventlog.Add(event)
 				for i := range str.subscribers {
 					str.subscribers[i].connection <- event
 				}
@@ -76,10 +79,11 @@ func (str *Stream) getSubIndex(sub *Subscriber) int {
 }
 
 // addSubscriber will create a new subscriber on a stream
-func (str *Stream) addSubscriber() *Subscriber {
+func (str *Stream) addSubscriber(eventid string) *Subscriber {
 	sub := &Subscriber{
+		eventid:    eventid,
 		quit:       str.deregister,
-		connection: make(chan []byte, 64),
+		connection: make(chan *Event, 64),
 	}
 
 	str.register <- sub

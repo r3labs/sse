@@ -84,7 +84,7 @@ func (s *Server) StreamExists(id string) bool {
 }
 
 // Publish sends a mesage to every client in a streamID
-func (s *Server) Publish(id string, event []byte) {
+func (s *Server) Publish(id string, event *Event) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.streams[id] != nil {
@@ -98,11 +98,11 @@ func (s *Server) getStream(id string) *Stream {
 	return s.streams[id]
 }
 
-func (s *Server) process(event []byte) []byte {
+func (s *Server) process(event *Event) *Event {
 	if s.EncodeBase64 {
-		output := make([]byte, base64.StdEncoding.EncodedLen(len(event)))
-		base64.StdEncoding.Encode(output, event)
-		return output
+		output := make([]byte, base64.StdEncoding.EncodedLen(len(event.Data)))
+		base64.StdEncoding.Encode(output, event.Data)
+		event.Data = output
 	}
 	return event
 }

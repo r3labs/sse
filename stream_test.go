@@ -21,13 +21,13 @@ func TestStream(t *testing.T) {
 		s.run()
 
 		Convey("When adding a subscriber", func() {
-			sub := s.addSubscriber()
+			sub := s.addSubscriber("0")
 
 			Convey("It should be stored", func() {
 				So(len(s.subscribers), ShouldEqual, 1)
 			})
 			Convey("It should receive messages", func() {
-				s.event <- []byte("test")
+				s.event <- &Event{Data: []byte("test")}
 				msg, err := wait(sub.connection, time.Second*1)
 
 				So(err, ShouldBeNil)
@@ -36,7 +36,7 @@ func TestStream(t *testing.T) {
 		})
 
 		Convey("When removing a subscriber", func() {
-			s.addSubscriber()
+			s.addSubscriber("0")
 			time.Sleep(time.Millisecond * 100)
 			s.removeSubscriber(0)
 
@@ -46,7 +46,7 @@ func TestStream(t *testing.T) {
 		})
 
 		Convey("When closing a subscriber down gracefully", func() {
-			sub := s.addSubscriber()
+			sub := s.addSubscriber("0")
 			sub.close()
 			time.Sleep(time.Millisecond * 100)
 
@@ -58,14 +58,14 @@ func TestStream(t *testing.T) {
 		Convey("When adding multiple subscribers", func() {
 			var subs []*Subscriber
 			for i := 0; i < 10; i++ {
-				subs = append(subs, s.addSubscriber())
+				subs = append(subs, s.addSubscriber("0"))
 			}
 
 			// Wait for all subscribers to be added
 			time.Sleep(time.Millisecond * 100)
 
 			Convey("They should all receive messages", func() {
-				s.event <- []byte("test")
+				s.event <- &Event{Data: []byte("test")}
 				for _, sub := range subs {
 					msg, err := wait(sub.connection, time.Second*1)
 					So(err, ShouldBeNil)

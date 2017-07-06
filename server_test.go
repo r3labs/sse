@@ -12,13 +12,13 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 )
 
-func wait(ch chan []byte, duration time.Duration) ([]byte, error) {
+func wait(ch chan *Event, duration time.Duration) ([]byte, error) {
 	var err error
 	var msg []byte
 
 	select {
 	case event := <-ch:
-		msg = event
+		msg = event.Data
 	case <-time.After(duration):
 		err = errors.New("timeout")
 	}
@@ -58,9 +58,9 @@ func TestServer(t *testing.T) {
 		Convey("When publishing to a stream that exists", func() {
 			s.CreateStream("test")
 			stream := s.getStream("test")
-			sub := stream.addSubscriber()
+			sub := stream.addSubscriber("0")
 
-			s.Publish("test", []byte("test"))
+			s.Publish("test", &Event{Data: []byte("test")})
 			Convey("It must be received by the subscribers", func() {
 				msg, err := wait(sub.connection, time.Second*1)
 				So(err, ShouldBeNil)
@@ -70,9 +70,9 @@ func TestServer(t *testing.T) {
 		})
 
 		Convey("When publishing to a stream that doesnt exist", func() {
-			s.Publish("test", []byte("test"))
+			s.Publish("test", &Event{Data: []byte("test")})
 			Convey("It must not cause an error", func() {
-				So(func() { s.Publish("test", []byte("test")) }, ShouldNotPanic)
+				So(func() { s.Publish("test", &Event{Data: []byte("test")}) }, ShouldNotPanic)
 			})
 
 		})
