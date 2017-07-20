@@ -63,33 +63,36 @@ func (c *Client) Subscribe(stream string, handler func(msg *Event)) error {
 
 // SubscribeChan sends all events to the provided channel
 func (c *Client) SubscribeChan(stream string, ch chan *Event) error {
-	defer close(ch)
-
 	resp, err := c.request(stream)
 	if err != nil {
+		close(ch)
 		return err
 	}
 
 	if resp.StatusCode != 200 {
+		close(ch)
 		return errors.New("could not connect to stream")
 	}
 
-	defer resp.Body.Close()
-
 	reader := bufio.NewReader(resp.Body)
 
-	for {
-		// Read each new line and process the type of event
-		line, err := reader.ReadBytes('\n')
-		if err != nil {
-			close(ch)
-			return err
+	go func() {
+		for {
+			// Read each new line and process the type of event
+			line, err := reader.ReadBytes('\n')
+			if err != nil {
+				resp.Body.Close()
+				close(ch)
+				return
+			}
+			msg := c.processEvent(line)
+			if msg != nil {
+				ch <- msg
+			}
 		}
-		msg := c.processEvent(line)
-		if msg != nil {
-			ch <- msg
-		}
-	}
+	}()
+
+	return nil
 }
 
 func (c *Client) request(stream string) (*http.Response, error) {
