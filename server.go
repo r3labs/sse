@@ -77,10 +77,7 @@ func (s *Server) StreamExists(id string) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if s.streams[id] != nil {
-		return true
-	}
-	return false
+	return s.streams[id] != nil
 }
 
 // Publish sends a mesage to every client in a streamID
