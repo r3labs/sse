@@ -19,7 +19,7 @@ type Server struct {
 	// Enables creation of a stream when a client connects
 	AutoStream   bool
 	EncodeBase64 bool
-	streams      map[string]*Stream
+	Streams      map[string]*Stream
 	mu           sync.Mutex
 }
 
@@ -28,7 +28,7 @@ func New() *Server {
 	return &Server{
 		BufferSize: DefaultBufferSize,
 		AutoStream: false,
-		streams:    make(map[string]*Stream),
+		Streams:    make(map[string]*Stream),
 	}
 }
 
@@ -37,9 +37,9 @@ func (s *Server) Close() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	for id := range s.streams {
-		s.streams[id].quit <- true
-		delete(s.streams, id)
+	for id := range s.Streams {
+		s.Streams[id].quit <- true
+		delete(s.Streams, id)
 	}
 }
 
@@ -52,11 +52,11 @@ func (s *Server) CreateStream(id string) *Stream {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if s.streams[id] != nil {
-		return s.streams[id]
+	if s.Streams[id] != nil {
+		return s.Streams[id]
 	}
 
-	s.streams[id] = str
+	s.Streams[id] = str
 
 	return str
 }
@@ -66,9 +66,9 @@ func (s *Server) RemoveStream(id string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if s.streams[id] != nil {
-		s.streams[id].close()
-		delete(s.streams, id)
+	if s.Streams[id] != nil {
+		s.Streams[id].close()
+		delete(s.Streams, id)
 	}
 }
 
@@ -77,22 +77,22 @@ func (s *Server) StreamExists(id string) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	return s.streams[id] != nil
+	return s.Streams[id] != nil
 }
 
 // Publish sends a mesage to every client in a streamID
 func (s *Server) Publish(id string, event *Event) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.streams[id] != nil {
-		s.streams[id].event <- s.process(event)
+	if s.Streams[id] != nil {
+		s.Streams[id].event <- s.process(event)
 	}
 }
 
 func (s *Server) getStream(id string) *Stream {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.streams[id]
+	return s.Streams[id]
 }
 
 func (s *Server) process(event *Event) *Event {
