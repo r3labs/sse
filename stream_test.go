@@ -35,6 +35,16 @@ func TestStream(t *testing.T) {
 			})
 		})
 
+		Convey("When adding a subscriber with auto replay disabled", func() {
+			s.AutoReplay = false
+			s.event <- &Event{Data: []byte("test")}
+			sub := s.addSubscriber("0")
+
+			Convey("It should not receive the eventlog", func() {
+				So(len(sub.connection), ShouldEqual, 0)
+			})
+		})
+
 		Convey("When removing a subscriber", func() {
 			s.addSubscriber("0")
 			time.Sleep(time.Millisecond * 100)
@@ -84,5 +94,4 @@ func TestStream(t *testing.T) {
 
 		})
 	})
-
 }
