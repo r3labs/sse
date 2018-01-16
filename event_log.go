@@ -15,6 +15,11 @@ func (e *EventLog) Add(ev *Event) {
 	(*e) = append((*e), ev)
 }
 
+// Clear events from eventlog
+func (e *EventLog) Clear() {
+	*e = nil
+}
+
 // Replay events to a subscriber
 func (e *EventLog) Replay(s *Subscriber) {
 	for i := 0; i < len((*e)); i++ {
