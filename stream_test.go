@@ -21,17 +21,23 @@ func TestStream(t *testing.T) {
 		s.run()
 
 		Convey("When adding a subscriber", func() {
+			s.event <- &Event{Data: []byte("test")}
 			sub := s.addSubscriber("0")
 
 			Convey("It should be stored", func() {
 				So(len(s.subscribers), ShouldEqual, 1)
 			})
+
 			Convey("It should receive messages", func() {
 				s.event <- &Event{Data: []byte("test")}
 				msg, err := wait(sub.connection, time.Second*1)
 
 				So(err, ShouldBeNil)
 				So(string(msg), ShouldEqual, "test")
+			})
+
+			Convey("It should receive the eventlog", func() {
+				So(len(sub.connection), ShouldEqual, 1)
 			})
 		})
 
@@ -91,7 +97,6 @@ func TestStream(t *testing.T) {
 
 				So(len(s.subscribers), ShouldEqual, 0)
 			})
-
 		})
 	})
 }
