@@ -6,6 +6,8 @@ package sse
 
 // Stream ...
 type Stream struct {
+	// Enables replaying of eventlog to newly added subscribers
+	AutoReplay  bool
 	stats       chan chan int
 	subscribers []*Subscriber
 	register    chan *Subscriber
@@ -24,6 +26,7 @@ type StreamRegistration struct {
 // newStream returns a new stream
 func newStream(bufsize int) *Stream {
 	return &Stream{
+		AutoReplay:  true,
 		subscribers: make([]*Subscriber, 0),
 		register:    make(chan *Subscriber),
 		deregister:  make(chan *Subscriber),
@@ -40,7 +43,9 @@ func (str *Stream) run() {
 			// Add new subscriber
 			case subscriber := <-str.register:
 				str.subscribers = append(str.subscribers, subscriber)
-				str.eventlog.Replay(subscriber)
+				if str.AutoReplay {
+					str.eventlog.Replay(subscriber)
+				}
 
 			// Remove closed subscriber
 			case subscriber := <-str.deregister:
