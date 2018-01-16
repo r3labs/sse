@@ -8,13 +8,13 @@ package sse
 type Stream struct {
 	// Enables replaying of eventlog to newly added subscribers
 	AutoReplay  bool
+	Eventlog    EventLog
 	stats       chan chan int
 	subscribers []*Subscriber
 	register    chan *Subscriber
 	deregister  chan *Subscriber
 	event       chan *Event
 	quit        chan bool
-	eventlog    EventLog
 }
 
 // StreamRegistration ...
@@ -32,7 +32,7 @@ func newStream(bufsize int) *Stream {
 		deregister:  make(chan *Subscriber),
 		event:       make(chan *Event, bufsize),
 		quit:        make(chan bool),
-		eventlog:    make(EventLog, 0),
+		Eventlog:    make(EventLog, 0),
 	}
 }
 
@@ -44,7 +44,7 @@ func (str *Stream) run() {
 			case subscriber := <-str.register:
 				str.subscribers = append(str.subscribers, subscriber)
 				if str.AutoReplay {
-					str.eventlog.Replay(subscriber)
+					str.Eventlog.Replay(subscriber)
 				}
 
 			// Remove closed subscriber
@@ -56,7 +56,7 @@ func (str *Stream) run() {
 
 			// Publish event to subscribers
 			case event := <-str.event:
-				str.eventlog.Add(event)
+				str.Eventlog.Add(event)
 				for i := range str.subscribers {
 					str.subscribers[i].connection <- event
 				}
