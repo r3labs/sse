@@ -11,6 +11,8 @@ import (
 	"errors"
 	"log"
 	"net/http"
+
+	backoff "gopkg.in/cenkalti/backoff.v1"
 )
 
 var (
@@ -40,59 +42,66 @@ func NewClient(url string) *Client {
 
 // Subscribe to a data stream
 func (c *Client) Subscribe(stream string, handler func(msg *Event)) error {
-	resp, err := c.request(stream)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	reader := bufio.NewReader(resp.Body)
-
-	for {
-		// Read each new line and process the type of event
-		line, err := reader.ReadBytes('\n')
+	operation := func() error {
+		resp, err := c.request(stream)
 		if err != nil {
 			return err
 		}
-		msg := c.processEvent(line)
-		if msg != nil {
-			handler(msg)
-		}
-	}
-}
+		defer resp.Body.Close()
 
-// SubscribeChan sends all events to the provided channel
-func (c *Client) SubscribeChan(stream string, ch chan *Event) error {
-	resp, err := c.request(stream)
-	if err != nil {
-		close(ch)
-		return err
-	}
+		reader := bufio.NewReader(resp.Body)
 
-	if resp.StatusCode != 200 {
-		close(ch)
-		return errors.New("could not connect to stream")
-	}
-
-	reader := bufio.NewReader(resp.Body)
-
-	go func() {
 		for {
 			// Read each new line and process the type of event
 			line, err := reader.ReadBytes('\n')
 			if err != nil {
-				resp.Body.Close()
-				close(ch)
-				return
+				return err
 			}
 			msg := c.processEvent(line)
 			if msg != nil {
-				ch <- msg
+				handler(msg)
 			}
 		}
-	}()
+	}
+	return backoff.Retry(operation, backoff.NewExponentialBackOff())
+}
 
-	return nil
+// SubscribeChan sends all events to the provided channel
+func (c *Client) SubscribeChan(stream string, ch chan *Event) error {
+	operation := func() error {
+		resp, err := c.request(stream)
+		if err != nil {
+			close(ch)
+			return err
+		}
+
+		if resp.StatusCode != 200 {
+			close(ch)
+			return errors.New("could not connect to stream")
+		}
+
+		reader := bufio.NewReader(resp.Body)
+
+		go func() {
+			for {
+				// Read each new line and process the type of event
+				line, err := reader.ReadBytes('\n')
+				if err != nil {
+					resp.Body.Close()
+					close(ch)
+					return
+				}
+				msg := c.processEvent(line)
+				if msg != nil {
+					ch <- msg
+				}
+			}
+		}()
+
+		return nil
+	}
+
+	return backoff.Retry(operation, backoff.NewExponentialBackOff())
 }
 
 func (c *Client) request(stream string) (*http.Response, error) {
