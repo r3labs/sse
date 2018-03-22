@@ -71,8 +71,6 @@ func TestClient(t *testing.T) {
 			events := make(chan *Event)
 			err := c.SubscribeChan("test", events)
 
-			close(events)
-
 			for i := 0; i < 5; i++ {
 				msg, merr := wait(events, time.Second*1)
 				if msg == nil {
@@ -83,6 +81,7 @@ func TestClient(t *testing.T) {
 				So(string(msg), ShouldEqual, "ping")
 			}
 			So(err, ShouldBeNil)
+			c.Unsubscribe(events)
 		})
 	})
 }

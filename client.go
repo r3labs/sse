@@ -29,6 +29,7 @@ type Client struct {
 	Headers        map[string]string
 	EncodingBase64 bool
 	EventID        string
+	subscribed     map[chan *Event]chan bool
 }
 
 // NewClient creates a new client
@@ -37,6 +38,7 @@ func NewClient(url string) *Client {
 		URL:        url,
 		Connection: &http.Client{},
 		Headers:    make(map[string]string),
+		subscribed: make(map[chan *Event]chan bool),
 	}
 }
 
@@ -82,6 +84,8 @@ func (c *Client) SubscribeChan(stream string, ch chan *Event) error {
 
 		reader := bufio.NewReader(resp.Body)
 
+		c.subscribed[ch] = make(chan bool)
+
 		go func() {
 			for {
 				// Read each new line and process the type of event
@@ -94,11 +98,10 @@ func (c *Client) SubscribeChan(stream string, ch chan *Event) error {
 				msg := c.processEvent(line)
 				if msg != nil {
 					select {
-
-					case ch <- msg:
-
-					default:
+					case <-c.subscribed[ch]:
 						return
+					default:
+						ch <- msg
 					}
 				}
 			}
@@ -108,6 +111,13 @@ func (c *Client) SubscribeChan(stream string, ch chan *Event) error {
 	}
 
 	return backoff.Retry(operation, backoff.NewExponentialBackOff())
+}
+
+// Unsubscribe : unsubscribes a channel
+func (c *Client) Unsubscribe(ch chan *Event) {
+	c.subscribed[ch] <- true
+	close(c.subscribed[ch])
+	close(ch)
 }
 
 func (c *Client) request(stream string) (*http.Response, error) {
