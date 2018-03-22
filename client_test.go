@@ -37,7 +37,8 @@ func setup() {
 
 func TestClient(t *testing.T) {
 	setup()
-	Convey("Given a new Client", t, func() {
+
+	Convey("Given a new Subscribe Client", t, func() {
 		c := NewClient(url)
 
 		Convey("When connecting to a new stream", func() {
@@ -60,7 +61,28 @@ func TestClient(t *testing.T) {
 				}
 				So(cErr, ShouldBeNil)
 			})
+		})
+	})
 
+	Convey("Given a new Chan Subscribe Client", t, func() {
+		c := NewClient(url)
+
+		Convey("It should receive events ", func() {
+			events := make(chan *Event)
+			err := c.SubscribeChan("test", events)
+
+			close(events)
+
+			for i := 0; i < 5; i++ {
+				msg, merr := wait(events, time.Second*1)
+				if msg == nil {
+					i--
+					continue
+				}
+				So(merr, ShouldBeNil)
+				So(string(msg), ShouldEqual, "ping")
+			}
+			So(err, ShouldBeNil)
 		})
 	})
 }

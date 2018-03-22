@@ -93,7 +93,13 @@ func (c *Client) SubscribeChan(stream string, ch chan *Event) error {
 				}
 				msg := c.processEvent(line)
 				if msg != nil {
-					ch <- msg
+					select {
+
+					case ch <- msg:
+
+					default:
+						return
+					}
 				}
 			}
 		}()
