@@ -72,7 +72,9 @@ func main() {
     server := sse.New()
 
     // Publish a payload to the stream
-    server.Publish("messages", []byte("ping"))
+    server.Publish("messages", &sse.Event{
+        Data: []byte("ping"),
+    })
 }
 ```
 
