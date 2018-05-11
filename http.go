@@ -70,6 +70,7 @@ func (s *Server) HTTPHandler(w http.ResponseWriter, r *http.Request) {
 			if len(ev.Data) > 0 {
 				fmt.Fprintf(w, "data: %s\n", ev.Data)
 			}
+			fmt.Fprint(w, "\n")
 			flusher.Flush()
 		}
 	}
