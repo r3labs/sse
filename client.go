@@ -99,6 +99,7 @@ func (c *Client) SubscribeChan(stream string, ch chan *Event) error {
 				if msg != nil {
 					select {
 					case <-c.subscribed[ch]:
+						resp.Body.Close()
 						return
 					default:
 						ch <- msg
