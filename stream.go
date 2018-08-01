@@ -24,9 +24,9 @@ type StreamRegistration struct {
 }
 
 // newStream returns a new stream
-func newStream(bufsize int) *Stream {
+func newStream(bufsize int, replay bool) *Stream {
 	return &Stream{
-		AutoReplay:  true,
+		AutoReplay:  replay,
 		subscribers: make([]*Subscriber, 0),
 		register:    make(chan *Subscriber),
 		deregister:  make(chan *Subscriber),
@@ -56,7 +56,9 @@ func (str *Stream) run() {
 
 			// Publish event to subscribers
 			case event := <-str.event:
-				str.Eventlog.Add(event)
+				if str.AutoReplay {
+					str.Eventlog.Add(event)
+				}
 				for i := range str.subscribers {
 					str.subscribers[i].connection <- event
 				}
