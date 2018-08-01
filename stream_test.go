@@ -17,7 +17,7 @@ import (
 func TestStream(t *testing.T) {
 	Convey("Given a new stream", t, func() {
 		// New Stream
-		s := newStream(1024)
+		s := newStream(1024, true)
 		s.run()
 
 		Convey("When adding a subscriber", func() {

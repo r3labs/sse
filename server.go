@@ -18,6 +18,8 @@ type Server struct {
 	BufferSize int
 	// Enables creation of a stream when a client connects
 	AutoStream   bool
+	// Allows to save the events, so when a new stream connects to receive the messages
+	SaveEvents   bool
 	EncodeBase64 bool
 	Streams      map[string]*Stream
 	mu           sync.Mutex
@@ -28,6 +30,7 @@ func New() *Server {
 	return &Server{
 		BufferSize: DefaultBufferSize,
 		AutoStream: false,
+		SaveEvents: true,
 		Streams:    make(map[string]*Stream),
 	}
 }
@@ -45,7 +48,7 @@ func (s *Server) Close() {
 
 // CreateStream will create a new stream and register it
 func (s *Server) CreateStream(id string) *Stream {
-	str := newStream(s.BufferSize)
+	str := newStream(s.BufferSize, s.SaveEvents)
 	str.run()
 
 	// Register new stream
