@@ -132,6 +132,27 @@ func main() {
 }
 ```
 
+#### URL query parameters
+
+To set custom query parameters on the client or disable the stream parameter altogether:
+
+```go
+func main() {
+    params := map[string]string{
+        "search": "example",
+    }
+
+    client := sse.NewClient("http://server/events")
+    client.SetQueryParams(params)
+
+    client.SubscribeRaw(func(msg *sse.Event) {
+        // Got some data!
+        fmt.Println(msg.Data)
+    })
+}
+```
+
+
 ## Contributing
 
 Please read through our
