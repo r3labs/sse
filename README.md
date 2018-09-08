@@ -138,12 +138,7 @@ To set custom query parameters on the client or disable the stream parameter alt
 
 ```go
 func main() {
-    params := map[string]string{
-        "search": "example",
-    }
-
-    client := sse.NewClient("http://server/events")
-    client.SetQueryParams(params)
+	client := sse.NewClient("http://server/events?search=example")
 
     client.SubscribeRaw(func(msg *sse.Event) {
         // Got some data!

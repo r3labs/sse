@@ -29,7 +29,6 @@ type Client struct {
 	Headers        map[string]string
 	EncodingBase64 bool
 	EventID        string
-	params         map[string]string
 	subscribed     map[chan *Event]chan bool
 }
 
@@ -45,78 +44,8 @@ func NewClient(url string) *Client {
 
 // Subscribe to a data stream
 func (c *Client) Subscribe(stream string, handler func(msg *Event)) error {
-	c.params = map[string]string{
-		"stream": stream,
-	}
-
-	return c.subscribe(handler)
-}
-
-// SubscribeChan sends all events to the provided channel
-func (c *Client) SubscribeChan(stream string, ch chan *Event) error {
-	c.params = map[string]string{
-		"stream": stream,
-	}
-
-	return c.subscribechan(ch)
-}
-
-// SubscribeRaw to an sse endpoint
-func (c *Client) SubscribeRaw(handler func(msg *Event)) error {
-	return c.subscribe(handler)
-}
-
-// SubscribeChanRaw sends all events to the provided channel
-func (c *Client) SubscribeChanRaw(ch chan *Event) error {
-	return c.subscribechan(ch)
-}
-
-// Unsubscribe : unsubscribes a channel
-func (c *Client) Unsubscribe(ch chan *Event) {
-	c.subscribed[ch] <- true
-	close(c.subscribed[ch])
-	close(ch)
-}
-
-// SetQueryParams : sets the query parameters for the request
-func (c *Client) SetQueryParams(q map[string]string) {
-	c.params = q
-}
-
-func (c *Client) request() (*http.Response, error) {
-	req, err := http.NewRequest("GET", c.URL, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	// Setup request, specify stream to connect to
-	if c.params != nil {
-		query := req.URL.Query()
-		for k, v := range c.params {
-			query.Add(k, v)
-		}
-		req.URL.RawQuery = query.Encode()
-	}
-
-	req.Header.Set("Cache-Control", "no-cache")
-	req.Header.Set("Accept", "text/event-stream")
-	req.Header.Set("Connection", "keep-alive")
-
-	if c.EventID != "" {
-		req.Header.Set("Last-Event-ID", c.EventID)
-	}
-
-	// Add user specified headers
-	for k, v := range c.Headers {
-		req.Header.Set(k, v)
-	}
-
-	return c.Connection.Do(req)
-}
-
-func (c *Client) subscribe(handler func(msg *Event)) error {
 	operation := func() error {
-		resp, err := c.request()
+		resp, err := c.request(stream)
 		if err != nil {
 			return err
 		}
@@ -139,9 +68,10 @@ func (c *Client) subscribe(handler func(msg *Event)) error {
 	return backoff.Retry(operation, backoff.NewExponentialBackOff())
 }
 
-func (c *Client) subscribechan(ch chan *Event) error {
+// SubscribeChan sends all events to the provided channel
+func (c *Client) SubscribeChan(stream string, ch chan *Event) error {
 	operation := func() error {
-		resp, err := c.request()
+		resp, err := c.request(stream)
 		if err != nil {
 			close(ch)
 			return err
@@ -182,6 +112,52 @@ func (c *Client) subscribechan(ch chan *Event) error {
 	}
 
 	return backoff.Retry(operation, backoff.NewExponentialBackOff())
+}
+
+// SubscribeRaw to an sse endpoint
+func (c *Client) SubscribeRaw(handler func(msg *Event)) error {
+	return c.Subscribe("", handler)
+}
+
+// SubscribeChanRaw sends all events to the provided channel
+func (c *Client) SubscribeChanRaw(ch chan *Event) error {
+	return c.SubscribeChan("", ch)
+}
+
+// Unsubscribe : unsubscribes a channel
+func (c *Client) Unsubscribe(ch chan *Event) {
+	c.subscribed[ch] <- true
+	close(c.subscribed[ch])
+	close(ch)
+}
+
+func (c *Client) request(stream string) (*http.Response, error) {
+	req, err := http.NewRequest("GET", c.URL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	// Setup request, specify stream to connect to
+	if stream != "" {
+		query := req.URL.Query()
+		query.Add("stream", stream)
+		req.URL.RawQuery = query.Encode()
+	}
+
+	req.Header.Set("Cache-Control", "no-cache")
+	req.Header.Set("Accept", "text/event-stream")
+	req.Header.Set("Connection", "keep-alive")
+
+	if c.EventID != "" {
+		req.Header.Set("Last-Event-ID", c.EventID)
+	}
+
+	// Add user specified headers
+	for k, v := range c.Headers {
+		req.Header.Set(k, v)
+	}
+
+	return c.Connection.Do(req)
 }
 
 func (c *Client) processEvent(msg []byte) *Event {
