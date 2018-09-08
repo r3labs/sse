@@ -114,6 +114,16 @@ func (c *Client) SubscribeChan(stream string, ch chan *Event) error {
 	return backoff.Retry(operation, backoff.NewExponentialBackOff())
 }
 
+// SubscribeRaw to an sse endpoint
+func (c *Client) SubscribeRaw(handler func(msg *Event)) error {
+	return c.Subscribe("", handler)
+}
+
+// SubscribeChanRaw sends all events to the provided channel
+func (c *Client) SubscribeChanRaw(ch chan *Event) error {
+	return c.SubscribeChan("", ch)
+}
+
 // Unsubscribe : unsubscribes a channel
 func (c *Client) Unsubscribe(ch chan *Event) {
 	c.subscribed[ch] <- true
@@ -128,9 +138,11 @@ func (c *Client) request(stream string) (*http.Response, error) {
 	}
 
 	// Setup request, specify stream to connect to
-	query := req.URL.Query()
-	query.Add("stream", stream)
-	req.URL.RawQuery = query.Encode()
+	if stream != "" {
+		query := req.URL.Query()
+		query.Add("stream", stream)
+		req.URL.RawQuery = query.Encode()
+	}
 
 	req.Header.Set("Cache-Control", "no-cache")
 	req.Header.Set("Accept", "text/event-stream")
