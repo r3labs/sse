@@ -70,40 +70,42 @@ func (c *Client) Subscribe(stream string, handler func(msg *Event)) error {
 
 // SubscribeChan sends all events to the provided channel
 func (c *Client) SubscribeChan(stream string, ch chan *Event) error {
+	c.subscribed[ch] = make(chan bool)
+
 	operation := func() error {
 		resp, err := c.request(stream)
 		if err != nil {
-			close(ch)
+			c.cleanup(resp, ch)
 			return err
 		}
 
 		if resp.StatusCode != 200 {
-			close(ch)
+			c.cleanup(resp, ch)
 			return errors.New("could not connect to stream")
 		}
 
 		reader := bufio.NewReader(resp.Body)
-
-		c.subscribed[ch] = make(chan bool)
 
 		go func() {
 			for {
 				// Read each new line and process the type of event
 				line, err := reader.ReadBytes('\n')
 				if err != nil {
-					resp.Body.Close()
-					close(ch)
+					c.cleanup(resp, ch)
 					return
 				}
+
 				msg := c.processEvent(line)
-				if msg != nil {
-					select {
-					case <-c.subscribed[ch]:
-						resp.Body.Close()
-						return
-					default:
-						ch <- msg
-					}
+				if msg == nil {
+					continue
+				}
+
+				select {
+				case <-c.subscribed[ch]:
+					c.cleanup(resp, ch)
+					return
+				case ch <- msg:
+					// message sent
 				}
 			}
 		}()
@@ -127,8 +129,6 @@ func (c *Client) SubscribeChanRaw(ch chan *Event) error {
 // Unsubscribe : unsubscribes a channel
 func (c *Client) Unsubscribe(ch chan *Event) {
 	c.subscribed[ch] <- true
-	close(c.subscribed[ch])
-	close(ch)
 }
 
 func (c *Client) request(stream string) (*http.Response, error) {
@@ -188,6 +188,15 @@ func (c *Client) processEvent(msg []byte) *Event {
 	}
 
 	return &e
+}
+
+func (c *Client) cleanup(resp *http.Response, ch chan *Event) {
+	if resp != nil {
+		resp.Body.Close()
+	}
+
+	close(c.subscribed[ch])
+	close(ch)
 }
 
 func trimHeader(size int, data []byte) []byte {
