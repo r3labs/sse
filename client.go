@@ -11,6 +11,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"sync"
 
 	backoff "gopkg.in/cenkalti/backoff.v1"
 )
@@ -30,6 +31,7 @@ type Client struct {
 	EncodingBase64 bool
 	EventID        string
 	subscribed     map[chan *Event]chan bool
+	mu             sync.Mutex
 }
 
 // NewClient creates a new client
@@ -128,7 +130,12 @@ func (c *Client) SubscribeChanRaw(ch chan *Event) error {
 
 // Unsubscribe : unsubscribes a channel
 func (c *Client) Unsubscribe(ch chan *Event) {
-	c.subscribed[ch] <- true
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.subscribed[ch] != nil {
+		c.subscribed[ch] <- true
+	}
 }
 
 func (c *Client) request(stream string) (*http.Response, error) {
@@ -195,8 +202,14 @@ func (c *Client) cleanup(resp *http.Response, ch chan *Event) {
 		resp.Body.Close()
 	}
 
-	close(c.subscribed[ch])
-	close(ch)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.subscribed[ch] != nil {
+		close(c.subscribed[ch])
+		close(ch)
+		delete(c.subscribed, ch)
+	}
 }
 
 func trimHeader(size int, data []byte) []byte {
