@@ -5,13 +5,13 @@
 package sse
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/base64"
 	"errors"
 	"log"
 	"net/http"
 	"sync"
+	"time"
 
 	backoff "gopkg.in/cenkalti/backoff.v1"
 )
@@ -20,19 +20,19 @@ var (
 	headerID    = []byte("id:")
 	headerData  = []byte("data:")
 	headerEvent = []byte("event:")
-	headerError = []byte("error:")
+	headerRetry = []byte("retry:")
 )
 
 // Client handles an incoming server stream
 type Client struct {
 	URL            string
 	Connection     *http.Client
+	Retry          time.Time
+	subscribed     map[chan *Event]chan bool
 	Headers        map[string]string
 	EncodingBase64 bool
 	EventID        string
-	subscribed     map[chan *Event]chan bool
-
-	sync.Mutex
+	mu             sync.Mutex
 }
 
 // NewClient creates a new client
@@ -54,18 +54,31 @@ func (c *Client) Subscribe(stream string, handler func(msg *Event)) error {
 		}
 		defer resp.Body.Close()
 
-		reader := bufio.NewReader(resp.Body)
+		reader := NewEventStreamReader(resp.Body)
 
 		for {
 			// Read each new line and process the type of event
-			line, err := reader.ReadBytes('\n')
+			event, err := reader.ReadEvent()
 			if err != nil {
 				return err
 			}
-			msg := c.processEvent(line)
-			if msg != nil {
-				handler(msg)
+
+			if len(event) < 1 {
+				continue
 			}
+
+			msg := c.processEvent(event)
+			if msg == nil {
+				continue
+			}
+
+			if len(msg.ID) > 0 {
+				c.EventID = string(msg.ID)
+			} else {
+				msg.ID = []byte(c.EventID)
+			}
+
+			handler(msg)
 		}
 	}
 	return backoff.Retry(operation, backoff.NewExponentialBackOff())
@@ -87,20 +100,31 @@ func (c *Client) SubscribeChan(stream string, ch chan *Event) error {
 			return errors.New("could not connect to stream")
 		}
 
-		reader := bufio.NewReader(resp.Body)
+		reader := NewEventStreamReader(resp.Body)
 
 		go func() {
+			defer resp.Body.Close()
 			for {
 				// Read each new line and process the type of event
-				line, err := reader.ReadBytes('\n')
+				event, err := reader.ReadEvent()
 				if err != nil {
 					c.cleanup(resp, ch)
 					return
 				}
 
-				msg := c.processEvent(line)
+				if len(event) < 1 {
+					continue
+				}
+
+				msg := c.processEvent(event)
 				if msg == nil {
 					continue
+				}
+
+				if len(msg.ID) > 0 {
+					c.EventID = string(msg.ID)
+				} else {
+					msg.ID = []byte(c.EventID)
 				}
 
 				select {
@@ -129,10 +153,10 @@ func (c *Client) SubscribeChanRaw(ch chan *Event) error {
 	return c.SubscribeChan("", ch)
 }
 
-// Unsubscribe : unsubscribes a channel
+// Unsubscribe unsubscribes a channel
 func (c *Client) Unsubscribe(ch chan *Event) {
-	c.Lock()
-	defer c.Unlock()
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
 	if c.subscribed[ch] != nil {
 		c.subscribed[ch] <- true
@@ -171,31 +195,49 @@ func (c *Client) request(stream string) (*http.Response, error) {
 func (c *Client) processEvent(msg []byte) *Event {
 	var e Event
 
-	switch h := msg; {
-	case bytes.Contains(h, headerID):
-		e.ID = trimHeader(len(headerID), msg)
-	case bytes.Contains(h, headerData):
-		e.Data = trimHeader(len(headerData), msg)
-	case bytes.Contains(h, headerEvent):
-		e.Event = trimHeader(len(headerEvent), msg)
-	case bytes.Contains(h, headerError):
-		e.Error = trimHeader(len(headerError), msg)
-	default:
-		return nil
-	}
-
-	if len(e.Data) > 0 && c.EncodingBase64 {
-		buf := make([]byte, base64.StdEncoding.DecodedLen(len(e.Data)))
-
-		_, err := base64.StdEncoding.Decode(buf, e.Data)
-		if err != nil {
-			log.Println(err)
+	// Normalize the crlf to lf to make it easier to split the lines.
+	bytes.Replace(msg, []byte("\n\r"), []byte("\n"), -1)
+	// Split the line by "\n" or "\r", per the spec.
+	for _, line := range bytes.FieldsFunc(msg, func(r rune) bool { return r == '\n' || r == '\r' }) {
+		switch {
+		case bytes.HasPrefix(line, headerID):
+			e.ID = trimHeader(len(headerID), line)
+		case bytes.HasPrefix(line, headerData):
+			// The spec allows for multiple data fields per event, concatenated them with "\n".
+			e.Data = append(append(trimHeader(len(headerData), line), e.Data[:]...), byte('\n'))
+		// The spec says that a line that simply contains the string "data" should be treated as a data field with an empty body.
+		case bytes.Equal(line, bytes.TrimSuffix(headerData, []byte(":"))):
+			e.Data = append(e.Data, byte('\n'))
+		case bytes.HasPrefix(line, headerEvent):
+			e.Event = trimHeader(len(headerEvent), line)
+		case bytes.HasPrefix(line, headerRetry):
+			e.Retry = trimHeader(len(headerRetry), line)
+		default:
+			return nil
 		}
-
-		e.Data = buf
 	}
 
-	return &e
+	// Trim the last "\n" per the spec.
+	e.Data = bytes.TrimSuffix(e.Data, []byte("\n"))
+
+	if len(e.Data) > 0 {
+		if c.EncodingBase64 {
+			buf := make([]byte, base64.StdEncoding.DecodedLen(len(e.Data)))
+
+			_, err := base64.StdEncoding.Decode(buf, e.Data)
+			if err != nil {
+				// TODO: We shouldn't be printing stuff from this library.
+				// Change this to return an error.
+				log.Println(err)
+			}
+
+			e.Data = buf
+		}
+		return &e
+	}
+
+	// If we made it here, then the event had a problem, so just return an empty event.
+	return new(Event)
 }
 
 func (c *Client) cleanup(resp *http.Response, ch chan *Event) {
@@ -203,8 +245,8 @@ func (c *Client) cleanup(resp *http.Response, ch chan *Event) {
 		resp.Body.Close()
 	}
 
-	c.Lock()
-	defer c.Unlock()
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
 	if c.subscribed[ch] != nil {
 		close(c.subscribed[ch])
