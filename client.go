@@ -31,7 +31,8 @@ type Client struct {
 	EncodingBase64 bool
 	EventID        string
 	subscribed     map[chan *Event]chan bool
-	mu             sync.Mutex
+
+	sync.Mutex
 }
 
 // NewClient creates a new client
@@ -130,8 +131,8 @@ func (c *Client) SubscribeChanRaw(ch chan *Event) error {
 
 // Unsubscribe : unsubscribes a channel
 func (c *Client) Unsubscribe(ch chan *Event) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.Lock()
+	defer c.Unlock()
 
 	if c.subscribed[ch] != nil {
 		c.subscribed[ch] <- true
@@ -202,8 +203,8 @@ func (c *Client) cleanup(resp *http.Response, ch chan *Event) {
 		resp.Body.Close()
 	}
 
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.Lock()
+	defer c.Unlock()
 
 	if c.subscribed[ch] != nil {
 		close(c.subscribed[ch])
