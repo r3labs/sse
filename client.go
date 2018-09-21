@@ -10,6 +10,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"sync"
 	"time"
 
 	backoff "gopkg.in/cenkalti/backoff.v1"
@@ -27,10 +28,11 @@ type Client struct {
 	URL            string
 	Connection     *http.Client
 	Retry          time.Time
+	subscribed     map[chan *Event]chan bool
 	Headers        map[string]string
 	EncodingBase64 bool
 	EventID        string
-	subscribed     map[chan *Event]chan bool
+	mu             sync.Mutex
 }
 
 // NewClient creates a new client
@@ -61,18 +63,22 @@ func (c *Client) Subscribe(stream string, handler func(msg *Event)) error {
 				return err
 			}
 
-			if len(event) > 0 {
-				msg := c.processEvent(event)
-				if msg != nil {
-					if len(msg.ID) > 0 {
-						c.EventID = string(msg.ID)
-					} else {
-						msg.ID = []byte(c.EventID)
-					}
-
-					handler(msg)
-				}
+			if len(event) < 1 {
+				continue
 			}
+
+			msg := c.processEvent(event)
+			if msg == nil {
+				continue
+			}
+
+			if len(msg.ID) > 0 {
+				c.EventID = string(msg.ID)
+			} else {
+				msg.ID = []byte(c.EventID)
+			}
+
+			handler(msg)
 		}
 	}
 	return backoff.Retry(operation, backoff.NewExponentialBackOff())
@@ -80,22 +86,21 @@ func (c *Client) Subscribe(stream string, handler func(msg *Event)) error {
 
 // SubscribeChan sends all events to the provided channel
 func (c *Client) SubscribeChan(stream string, ch chan *Event) error {
+	c.subscribed[ch] = make(chan bool)
+
 	operation := func() error {
 		resp, err := c.request(stream)
 		if err != nil {
-			close(ch)
+			c.cleanup(resp, ch)
 			return err
 		}
 
 		if resp.StatusCode != 200 {
-			resp.Body.Close()
-			close(ch)
+			c.cleanup(resp, ch)
 			return errors.New("could not connect to stream")
 		}
 
 		reader := NewEventStreamReader(resp.Body)
-
-		c.subscribed[ch] = make(chan bool)
 
 		go func() {
 			defer resp.Body.Close()
@@ -103,28 +108,31 @@ func (c *Client) SubscribeChan(stream string, ch chan *Event) error {
 				// Read each new line and process the type of event
 				event, err := reader.ReadEvent()
 				if err != nil {
-					resp.Body.Close()
-					close(ch)
+					c.cleanup(resp, ch)
 					return
 				}
 
-				if len(event) > 0 {
-					msg := c.processEvent(event)
-					if msg != nil {
-						if len(msg.ID) > 0 {
-							c.EventID = string(msg.ID)
-						} else {
-							msg.ID = []byte(c.EventID)
-						}
+				if len(event) < 1 {
+					continue
+				}
 
-						select {
-						case <-c.subscribed[ch]:
-							resp.Body.Close()
-							return
-						default:
-							ch <- msg
-						}
-					}
+				msg := c.processEvent(event)
+				if msg == nil {
+					continue
+				}
+
+				if len(msg.ID) > 0 {
+					c.EventID = string(msg.ID)
+				} else {
+					msg.ID = []byte(c.EventID)
+				}
+
+				select {
+				case <-c.subscribed[ch]:
+					c.cleanup(resp, ch)
+					return
+				case ch <- msg:
+					// message sent
 				}
 			}
 		}()
@@ -147,9 +155,12 @@ func (c *Client) SubscribeChanRaw(ch chan *Event) error {
 
 // Unsubscribe unsubscribes a channel
 func (c *Client) Unsubscribe(ch chan *Event) {
-	c.subscribed[ch] <- true
-	close(c.subscribed[ch])
-	close(ch)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.subscribed[ch] != nil {
+		c.subscribed[ch] <- true
+	}
 }
 
 func (c *Client) request(stream string) (*http.Response, error) {
@@ -227,6 +238,21 @@ func (c *Client) processEvent(msg []byte) *Event {
 
 	// If we made it here, then the event had a problem, so just return an empty event.
 	return new(Event)
+}
+
+func (c *Client) cleanup(resp *http.Response, ch chan *Event) {
+	if resp != nil {
+		resp.Body.Close()
+	}
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.subscribed[ch] != nil {
+		close(c.subscribed[ch])
+		close(ch)
+		delete(c.subscribed, ch)
+	}
 }
 
 func trimHeader(size int, data []byte) []byte {

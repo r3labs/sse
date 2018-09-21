@@ -30,7 +30,7 @@ func setup() {
 	go func(s *Server) {
 		for {
 			s.Publish("test", &Event{Data: []byte("ping")})
-			time.Sleep(time.Millisecond * 500)
+			time.Sleep(time.Millisecond * 50)
 		}
 	}(s)
 }
@@ -67,9 +67,10 @@ func TestClient(t *testing.T) {
 	Convey("Given a new Chan Subscribe Client", t, func() {
 		c := NewClient(url)
 
-		Convey("It should receive events ", func() {
+		Convey("It should receive events", func() {
 			events := make(chan *Event)
 			err := c.SubscribeChan("test", events)
+			So(err, ShouldBeNil)
 
 			for i := 0; i < 5; i++ {
 				msg, merr := wait(events, time.Second*1)
@@ -80,8 +81,18 @@ func TestClient(t *testing.T) {
 				So(merr, ShouldBeNil)
 				So(string(msg), ShouldEqual, "ping")
 			}
-			So(err, ShouldBeNil)
 			c.Unsubscribe(events)
+		})
+
+		Convey("It should shutdown gracefully", func() {
+			events := make(chan *Event)
+			err := c.SubscribeChan("test", events)
+			So(err, ShouldBeNil)
+
+			time.Sleep(time.Millisecond * 500)
+
+			go c.Unsubscribe(events)
+			go c.Unsubscribe(events)
 		})
 	})
 }
