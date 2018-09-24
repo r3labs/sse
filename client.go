@@ -8,7 +8,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"errors"
-	"log"
+	"fmt"
 	"net/http"
 	"sync"
 	"time"
@@ -63,22 +63,16 @@ func (c *Client) Subscribe(stream string, handler func(msg *Event)) error {
 				return err
 			}
 
-			if len(event) < 1 {
-				continue
-			}
+			// If we get an error, ignore it.
+			if msg, err := c.processEvent(event); err == nil {
+				if len(msg.ID) > 0 {
+					c.EventID = string(msg.ID)
+				} else {
+					msg.ID = []byte(c.EventID)
+				}
 
-			msg := c.processEvent(event)
-			if msg == nil {
-				continue
+				handler(msg)
 			}
-
-			if len(msg.ID) > 0 {
-				c.EventID = string(msg.ID)
-			} else {
-				msg.ID = []byte(c.EventID)
-			}
-
-			handler(msg)
 		}
 	}
 	return backoff.Retry(operation, backoff.NewExponentialBackOff())
@@ -103,7 +97,6 @@ func (c *Client) SubscribeChan(stream string, ch chan *Event) error {
 		reader := NewEventStreamReader(resp.Body)
 
 		go func() {
-			defer resp.Body.Close()
 			for {
 				// Read each new line and process the type of event
 				event, err := reader.ReadEvent()
@@ -112,27 +105,21 @@ func (c *Client) SubscribeChan(stream string, ch chan *Event) error {
 					return
 				}
 
-				if len(event) < 1 {
-					continue
-				}
+				// If we get an error, ignore it.
+				if msg, err := c.processEvent(event); err == nil {
+					if len(msg.ID) > 0 {
+						c.EventID = string(msg.ID)
+					} else {
+						msg.ID = []byte(c.EventID)
+					}
 
-				msg := c.processEvent(event)
-				if msg == nil {
-					continue
-				}
-
-				if len(msg.ID) > 0 {
-					c.EventID = string(msg.ID)
-				} else {
-					msg.ID = []byte(c.EventID)
-				}
-
-				select {
-				case <-c.subscribed[ch]:
-					c.cleanup(resp, ch)
-					return
-				case ch <- msg:
-					// message sent
+					select {
+					case <-c.subscribed[ch]:
+						c.cleanup(resp, ch)
+						return
+					case ch <- msg:
+						// message sent
+					}
 				}
 			}
 		}()
@@ -192,8 +179,12 @@ func (c *Client) request(stream string) (*http.Response, error) {
 	return c.Connection.Do(req)
 }
 
-func (c *Client) processEvent(msg []byte) *Event {
+func (c *Client) processEvent(msg []byte) (event *Event, err error) {
 	var e Event
+
+	if len(msg) < 1 {
+		return nil, errors.New("event message was empty")
+	}
 
 	// Normalize the crlf to lf to make it easier to split the lines.
 	bytes.Replace(msg, []byte("\n\r"), []byte("\n"), -1)
@@ -213,7 +204,7 @@ func (c *Client) processEvent(msg []byte) *Event {
 		case bytes.HasPrefix(line, headerRetry):
 			e.Retry = trimHeader(len(headerRetry), line)
 		default:
-			return nil
+			// Ignore any garbage that doesn't match what we're looking for.
 		}
 	}
 
@@ -226,18 +217,15 @@ func (c *Client) processEvent(msg []byte) *Event {
 
 			_, err := base64.StdEncoding.Decode(buf, e.Data)
 			if err != nil {
-				// TODO: We shouldn't be printing stuff from this library.
-				// Change this to return an error.
-				log.Println(err)
+				err = fmt.Errorf("failed to decode event message: %s", err)
 			}
-
 			e.Data = buf
 		}
-		return &e
+		return &e, err
 	}
 
-	// If we made it here, then the event had a problem, so just return an empty event.
-	return new(Event)
+	// If we made it here, then the event had a problem.
+	return nil, errors.New("invalid event message")
 }
 
 func (c *Client) cleanup(resp *http.Response, ch chan *Event) {
