@@ -45,14 +45,14 @@ func TestClient(t *testing.T) {
 			Convey("It should receive events ", func() {
 				events := make(chan *Event)
 				var cErr error
-				go func(cErr error) {
+				go func() {
 					cErr = c.Subscribe("test", func(msg *Event) {
 						if msg.Data != nil {
 							events <- msg
 							return
 						}
 					})
-				}(cErr)
+				}()
 
 				for i := 0; i < 5; i++ {
 					msg, err := wait(events, time.Second*1)
