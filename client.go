@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"errors"
+	"io"
 	"log"
 	"net/http"
 	"sync"
@@ -60,6 +61,9 @@ func (c *Client) Subscribe(stream string, handler func(msg *Event)) error {
 			// Read each new line and process the type of event
 			event, err := reader.ReadEvent()
 			if err != nil {
+				if err == io.EOF {
+					return nil
+				}
 				return err
 			}
 
