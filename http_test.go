@@ -33,14 +33,14 @@ func TestHTTP(t *testing.T) {
 
 				events := make(chan *Event)
 				var cErr error
-				go func(cErr error) {
+				go func() {
 					cErr = c.Subscribe("test", func(msg *Event) {
 						if msg.Data != nil {
 							events <- msg
 							return
 						}
 					})
-				}(cErr)
+				}()
 
 				// Wait for subscriber to be registered and message to be published
 				time.Sleep(time.Millisecond * 200)
@@ -65,19 +65,17 @@ func TestHTTP(t *testing.T) {
 
 			Convey("And eventid is not specified", func() {
 				Convey("It should publish all previous events to its subscriber", func() {
-					var cErr error
-
 					c := NewClient(server.URL + "/events")
 
 					events := make(chan *Event)
-
-					go func(cErr error) {
+					var cErr error
+					go func() {
 						cErr = c.Subscribe("test2", func(msg *Event) {
 							if len(msg.Data) > 0 {
 								events <- msg
 							}
 						})
-					}(cErr)
+					}()
 
 					So(cErr, ShouldBeNil)
 
@@ -91,20 +89,18 @@ func TestHTTP(t *testing.T) {
 
 			Convey("And eventid is specified", func() {
 				Convey("It should publish all events after eventid to its subscriber", func() {
-					var cErr error
-
 					c := NewClient(server.URL + "/events")
 					c.EventID = "2"
 
 					events := make(chan *Event)
-
-					go func(cErr error) {
+					var cErr error
+					go func() {
 						cErr = c.Subscribe("test2", func(msg *Event) {
 							if len(msg.Data) > 0 {
 								events <- msg
 							}
 						})
-					}(cErr)
+					}()
 
 					So(cErr, ShouldBeNil)
 
