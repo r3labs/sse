@@ -6,6 +6,7 @@ package sse
 
 import (
 	"errors"
+	"runtime"
 	"testing"
 	"time"
 
@@ -37,6 +38,18 @@ func TestServer(t *testing.T) {
 				So(s.getStream("test"), ShouldNotBeNil)
 			})
 			Convey("It should be started", func() {
+			})
+		})
+
+		Convey("When creating a stream that already exists", func() {
+			numGoRoutines := runtime.NumGoroutine()
+			s.CreateStream("test")
+
+			Convey("It should still be stored", func() {
+				So(s.getStream("test"), ShouldNotBeNil)
+			})
+			Convey("The number of goroutines should not increase", func() {
+				So(runtime.NumGoroutine(), ShouldEqual, numGoRoutines)
 			})
 		})
 
