@@ -152,8 +152,6 @@ func (c *Client) SubscribeChan(stream string, ch chan *Event) error {
 					}
 				}
 			}
-
-			return nil
 		}
 
 		err := backoff.Retry(operation, backoff.NewExponentialBackOff())
