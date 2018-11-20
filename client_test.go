@@ -14,6 +14,7 @@ import (
 )
 
 var url string
+var server *httptest.Server
 
 func setup() {
 	// New Server
@@ -21,7 +22,7 @@ func setup() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/events", s.HTTPHandler)
-	server := httptest.NewServer(mux)
+	server = httptest.NewServer(mux)
 	url = server.URL + "/events"
 
 	s.CreateStream("test")
@@ -36,9 +37,13 @@ func setup() {
 }
 
 func TestClient(t *testing.T) {
-	setup()
 
 	Convey("Given a new Subscribe Client", t, func() {
+		setup()
+		defer func() {
+			server.CloseClientConnections()
+			server.Close()
+		}()
 		c := NewClient(url)
 
 		Convey("When connecting to a new stream", func() {
@@ -62,9 +67,30 @@ func TestClient(t *testing.T) {
 				So(cErr, ShouldBeNil)
 			})
 		})
+
+		Convey("When disconnected", func() {
+			Convey("It should run the user defined callback ", func() {
+				called := make(chan bool)
+				c.OnDisconnect(func(client *Client) {
+					called <- true
+				})
+
+				go c.Subscribe("test", func(msg *Event) {})
+
+				time.Sleep(time.Second)
+				server.CloseClientConnections()
+
+				So(<-called, ShouldBeTrue)
+			})
+		})
 	})
 
 	Convey("Given a new Chan Subscribe Client", t, func() {
+		setup()
+		defer func() {
+			server.CloseClientConnections()
+			server.Close()
+		}()
 		c := NewClient(url)
 
 		Convey("It should receive events", func() {
@@ -73,6 +99,27 @@ func TestClient(t *testing.T) {
 			So(err, ShouldBeNil)
 
 			for i := 0; i < 5; i++ {
+				msg, merr := wait(events, time.Second*1)
+				if msg == nil {
+					i--
+					continue
+				}
+				So(merr, ShouldBeNil)
+				So(string(msg), ShouldEqual, "ping")
+			}
+			c.Unsubscribe(events)
+		})
+
+		Convey("It should reconnect after a disconnected connection", func() {
+			events := make(chan *Event)
+			err := c.SubscribeChan("test", events)
+			So(err, ShouldBeNil)
+
+			for i := 0; i < 10; i++ {
+				if i == 5 {
+					// kill connection
+					server.CloseClientConnections()
+				}
 				msg, merr := wait(events, time.Second*1)
 				if msg == nil {
 					i--
