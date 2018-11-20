@@ -10,7 +10,8 @@ import (
 	"testing"
 	"time"
 
-	. "github.com/smartystreets/goconvey/convey"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func wait(ch chan *Event, duration time.Duration) ([]byte, error) {
@@ -26,69 +27,62 @@ func wait(ch chan *Event, duration time.Duration) ([]byte, error) {
 	return msg, err
 }
 
-func TestServer(t *testing.T) {
-	// New Server
+func TestServerCreateStream(t *testing.T) {
 	s := New()
 
-	Convey("Given a new server", t, func() {
-		Convey("When creating a new stream", func() {
-			s.CreateStream("test")
+	s.CreateStream("test")
 
-			Convey("It should be stored", func() {
-				So(s.getStream("test"), ShouldNotBeNil)
-			})
-			Convey("It should be started", func() {
-			})
-		})
+	assert.NotNil(t, s.getStream("test"))
+}
 
-		Convey("When creating a stream that already exists", func() {
-			numGoRoutines := runtime.NumGoroutine()
-			s.CreateStream("test")
+func TestServerCreateExistingStream(t *testing.T) {
+	s := New()
 
-			Convey("It should still be stored", func() {
-				So(s.getStream("test"), ShouldNotBeNil)
-			})
-			Convey("The number of goroutines should not increase", func() {
-				So(runtime.NumGoroutine(), ShouldEqual, numGoRoutines)
-			})
-		})
+	s.CreateStream("test")
 
-		Convey("When removing a stream that exists", func() {
-			s.CreateStream("test")
-			s.RemoveStream("test")
+	numGoRoutines := runtime.NumGoroutine()
 
-			Convey("It should be removed", func() {
-				So(s.getStream("test"), ShouldBeNil)
-			})
-		})
+	s.CreateStream("test")
 
-		Convey("When removing a stream that doesn't exist", func() {
-			Convey("It should not panic", func() {
-				So(func() { s.RemoveStream("test") }, ShouldNotPanic)
-			})
-		})
+	assert.NotNil(t, s.getStream("test"))
+	assert.Equal(t, numGoRoutines, runtime.NumGoroutine())
+}
 
-		Convey("When publishing to a stream that exists", func() {
-			s.CreateStream("test")
-			stream := s.getStream("test")
-			sub := stream.addSubscriber("0")
+func TestServerRemoveStream(t *testing.T) {
+	s := New()
 
-			s.Publish("test", &Event{Data: []byte("test")})
-			Convey("It must be received by the subscribers", func() {
-				msg, err := wait(sub.connection, time.Second*1)
-				So(err, ShouldBeNil)
-				So(string(msg), ShouldEqual, "test")
-			})
+	s.CreateStream("test")
+	s.RemoveStream("test")
 
-		})
+	assert.Nil(t, s.getStream("test"))
+}
 
-		Convey("When publishing to a stream that doesnt exist", func() {
-			s.Publish("test", &Event{Data: []byte("test")})
-			Convey("It must not cause an error", func() {
-				So(func() { s.Publish("test", &Event{Data: []byte("test")}) }, ShouldNotPanic)
-			})
+func TestServerRemoveNonExistentStream(t *testing.T) {
+	s := New()
 
-		})
-	})
+	s.RemoveStream("test")
 
+	assert.NotPanics(t, func() { s.RemoveStream("test") })
+}
+
+func TestServerExistingStreamPublish(t *testing.T) {
+	s := New()
+
+	s.CreateStream("test")
+	stream := s.getStream("test")
+	sub := stream.addSubscriber("0")
+
+	s.Publish("test", &Event{Data: []byte("test")})
+
+	msg, err := wait(sub.connection, time.Second*1)
+	require.Nil(t, err)
+	assert.Equal(t, []byte(`test`), msg)
+}
+
+func TestServerNonExistentStreamPublish(t *testing.T) {
+	s := New()
+
+	s.RemoveStream("test")
+
+	assert.NotPanics(t, func() { s.Publish("test", &Event{Data: []byte("test")}) })
 }

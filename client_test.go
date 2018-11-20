@@ -10,7 +10,8 @@ import (
 	"testing"
 	"time"
 
-	. "github.com/smartystreets/goconvey/convey"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var url string
@@ -36,110 +37,116 @@ func setup() {
 	}(s)
 }
 
-func TestClient(t *testing.T) {
+func cleanup() {
+	server.CloseClientConnections()
+	server.Close()
+}
 
-	Convey("Given a new Subscribe Client", t, func() {
-		setup()
-		defer func() {
-			server.CloseClientConnections()
-			server.Close()
-		}()
-		c := NewClient(url)
+func TestClientSubscribe(t *testing.T) {
+	setup()
+	defer cleanup()
 
-		Convey("When connecting to a new stream", func() {
-			Convey("It should receive events ", func() {
-				events := make(chan *Event)
-				var cErr error
-				go func() {
-					cErr = c.Subscribe("test", func(msg *Event) {
-						if msg.Data != nil {
-							events <- msg
-							return
-						}
-					})
-				}()
+	c := NewClient(url)
 
-				for i := 0; i < 5; i++ {
-					msg, err := wait(events, time.Second*1)
-					So(err, ShouldBeNil)
-					So(string(msg), ShouldEqual, "ping")
-				}
-				So(cErr, ShouldBeNil)
-			})
+	events := make(chan *Event)
+	var cErr error
+	go func() {
+		cErr = c.Subscribe("test", func(msg *Event) {
+			if msg.Data != nil {
+				events <- msg
+				return
+			}
 		})
+	}()
 
-		Convey("When disconnected", func() {
-			Convey("It should run the user defined callback ", func() {
-				called := make(chan bool)
-				c.OnDisconnect(func(client *Client) {
-					called <- true
-				})
+	for i := 0; i < 5; i++ {
+		msg, err := wait(events, time.Second*1)
+		require.Nil(t, err)
+		assert.Equal(t, []byte(`ping`), msg)
+	}
 
-				go c.Subscribe("test", func(msg *Event) {})
+	assert.Nil(t, cErr)
+}
 
-				time.Sleep(time.Second)
-				server.CloseClientConnections()
+func TestClientChanSubscribe(t *testing.T) {
+	setup()
+	defer cleanup()
 
-				So(<-called, ShouldBeTrue)
-			})
-		})
+	c := NewClient(url)
+
+	events := make(chan *Event)
+	err := c.SubscribeChan("test", events)
+	require.Nil(t, err)
+
+	for i := 0; i < 5; i++ {
+		msg, merr := wait(events, time.Second*1)
+		if msg == nil {
+			i--
+			continue
+		}
+		assert.Nil(t, merr)
+		assert.Equal(t, []byte(`ping`), msg)
+	}
+	c.Unsubscribe(events)
+}
+
+func TestClientOnDisconnect(t *testing.T) {
+	setup()
+	defer cleanup()
+
+	c := NewClient(url)
+
+	called := make(chan bool)
+	c.OnDisconnect(func(client *Client) {
+		called <- true
 	})
 
-	Convey("Given a new Chan Subscribe Client", t, func() {
-		setup()
-		defer func() {
+	go c.Subscribe("test", func(msg *Event) {})
+
+	time.Sleep(time.Second)
+	server.CloseClientConnections()
+
+	assert.True(t, <-called)
+}
+
+func TestClientChanReconnect(t *testing.T) {
+	setup()
+	defer cleanup()
+
+	c := NewClient(url)
+
+	events := make(chan *Event)
+	err := c.SubscribeChan("test", events)
+	require.Nil(t, err)
+
+	for i := 0; i < 10; i++ {
+		if i == 5 {
+			// kill connection
 			server.CloseClientConnections()
-			server.Close()
-		}()
-		c := NewClient(url)
+		}
+		msg, merr := wait(events, time.Second*1)
+		if msg == nil {
+			i--
+			continue
+		}
+		assert.Nil(t, merr)
+		assert.Equal(t, []byte(`ping`), msg)
+	}
+	c.Unsubscribe(events)
+}
 
-		Convey("It should receive events", func() {
-			events := make(chan *Event)
-			err := c.SubscribeChan("test", events)
-			So(err, ShouldBeNil)
+func TestClientUnsubscribe(t *testing.T) {
+	setup()
+	defer cleanup()
 
-			for i := 0; i < 5; i++ {
-				msg, merr := wait(events, time.Second*1)
-				if msg == nil {
-					i--
-					continue
-				}
-				So(merr, ShouldBeNil)
-				So(string(msg), ShouldEqual, "ping")
-			}
-			c.Unsubscribe(events)
-		})
+	c := NewClient(url)
 
-		Convey("It should reconnect after a disconnected connection", func() {
-			events := make(chan *Event)
-			err := c.SubscribeChan("test", events)
-			So(err, ShouldBeNil)
+	events := make(chan *Event)
+	err := c.SubscribeChan("test", events)
+	require.Nil(t, err)
 
-			for i := 0; i < 10; i++ {
-				if i == 5 {
-					// kill connection
-					server.CloseClientConnections()
-				}
-				msg, merr := wait(events, time.Second*1)
-				if msg == nil {
-					i--
-					continue
-				}
-				So(merr, ShouldBeNil)
-				So(string(msg), ShouldEqual, "ping")
-			}
-			c.Unsubscribe(events)
-		})
+	time.Sleep(time.Millisecond * 500)
 
-		Convey("It should shutdown gracefully", func() {
-			events := make(chan *Event)
-			err := c.SubscribeChan("test", events)
-			So(err, ShouldBeNil)
-
-			time.Sleep(time.Millisecond * 500)
-
-			go c.Unsubscribe(events)
-			go c.Unsubscribe(events)
-		})
-	})
+	go c.Unsubscribe(events)
+	go c.Unsubscribe(events)
 }

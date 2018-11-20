@@ -8,96 +8,88 @@ import (
 	"testing"
 	"time"
 
-	. "github.com/smartystreets/goconvey/convey"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // Tests are accessing subscriber in a non-threadsafe way.
 // Maybe fix this in the future so we can test with -race enabled
 
-func TestStream(t *testing.T) {
-	Convey("Given a new stream", t, func() {
-		// New Stream
-		s := newStream(1024, true)
-		s.run()
+func TestStreamAddSubscriber(t *testing.T) {
+	s := newStream(1024, true)
+	s.run()
 
-		Convey("When adding a subscriber", func() {
-			s.event <- &Event{Data: []byte("test")}
-			sub := s.addSubscriber("0")
+	s.event <- &Event{Data: []byte("test")}
+	sub := s.addSubscriber("0")
 
-			Convey("It should be stored", func() {
-				So(len(s.subscribers), ShouldEqual, 1)
-			})
+	assert.Equal(t, 1, len(s.subscribers))
 
-			Convey("It should receive messages", func() {
-				s.event <- &Event{Data: []byte("test")}
-				msg, err := wait(sub.connection, time.Second*1)
+	s.event <- &Event{Data: []byte("test")}
+	msg, err := wait(sub.connection, time.Second*1)
 
-				So(err, ShouldBeNil)
-				So(string(msg), ShouldEqual, "test")
-			})
+	require.Nil(t, err)
+	assert.Equal(t, []byte(`test`), msg)
+	assert.Equal(t, 0, len(sub.connection))
+}
 
-			Convey("It should receive the eventlog", func() {
-				So(len(sub.connection), ShouldEqual, 1)
-			})
-		})
+func TestStreamRemoveSubscriber(t *testing.T) {
+	s := newStream(1024, true)
+	s.run()
 
-		Convey("When adding a subscriber with auto replay disabled", func() {
-			s.AutoReplay = false
-			s.event <- &Event{Data: []byte("test")}
-			time.Sleep(time.Millisecond * 100)
-			sub := s.addSubscriber("0")
+	s.addSubscriber("0")
+	time.Sleep(time.Millisecond * 100)
+	s.removeSubscriber(0)
 
-			Convey("It should not receive the eventlog", func() {
-				So(len(sub.connection), ShouldEqual, 0)
-			})
-		})
+	assert.Equal(t, 0, len(s.subscribers))
+}
 
-		Convey("When removing a subscriber", func() {
-			s.addSubscriber("0")
-			time.Sleep(time.Millisecond * 100)
-			s.removeSubscriber(0)
+func TestStreamSubscriberClose(t *testing.T) {
+	s := newStream(1024, true)
+	s.run()
 
-			Convey("It should be removed from the list of subscribers", func() {
-				So(len(s.subscribers), ShouldEqual, 0)
-			})
-		})
+	sub := s.addSubscriber("0")
+	sub.close()
+	time.Sleep(time.Millisecond * 100)
 
-		Convey("When closing a subscriber down gracefully", func() {
-			sub := s.addSubscriber("0")
-			sub.close()
-			time.Sleep(time.Millisecond * 100)
+	assert.Equal(t, 0, len(s.subscribers))
+}
 
-			Convey("It should be removed from the list of subscribers", func() {
-				So(len(s.subscribers), ShouldEqual, 0)
-			})
-		})
+func TestStreamDisableAutoReplay(t *testing.T) {
+	s := newStream(1024, true)
+	s.run()
 
-		Convey("When adding multiple subscribers", func() {
-			var subs []*Subscriber
-			for i := 0; i < 10; i++ {
-				subs = append(subs, s.addSubscriber("0"))
-			}
+	s.AutoReplay = false
+	s.event <- &Event{Data: []byte("test")}
+	time.Sleep(time.Millisecond * 100)
+	sub := s.addSubscriber("0")
 
-			// Wait for all subscribers to be added
-			time.Sleep(time.Millisecond * 100)
+	assert.Equal(t, 0, len(sub.connection))
+}
 
-			Convey("They should all receive messages", func() {
-				s.event <- &Event{Data: []byte("test")}
-				for _, sub := range subs {
-					msg, err := wait(sub.connection, time.Second*1)
-					So(err, ShouldBeNil)
-					So(string(msg), ShouldEqual, "test")
-				}
-			})
+func TestStreamMultipleSubscribers(t *testing.T) {
+	var subs []*Subscriber
 
-			Convey("They should all shutdown gracefully when the stream is closed", func() {
-				s.close()
+	s := newStream(1024, true)
+	s.run()
 
-				// Wait for all subscribers to close
-				time.Sleep(time.Millisecond * 100)
+	for i := 0; i < 10; i++ {
+		subs = append(subs, s.addSubscriber("0"))
+	}
 
-				So(len(s.subscribers), ShouldEqual, 0)
-			})
-		})
-	})
+	// Wait for all subscribers to be added
+	time.Sleep(time.Millisecond * 100)
+
+	s.event <- &Event{Data: []byte("test")}
+	for _, sub := range subs {
+		msg, err := wait(sub.connection, time.Second*1)
+		require.Nil(t, err)
+		assert.Equal(t, []byte(`test`), msg)
+	}
+
+	s.close()
+
+	// Wait for all subscribers to close
+	time.Sleep(time.Millisecond * 100)
+	assert.Equal(t, 0, len(s.subscribers))
+
 }
