@@ -27,8 +27,18 @@ func wait(ch chan *Event, duration time.Duration) ([]byte, error) {
 	return msg, err
 }
 
+func waitEvent(ch chan *Event, duration time.Duration) (*Event, error) {
+	select {
+	case event := <-ch:
+		return event, nil
+	case <-time.After(duration):
+		return nil, errors.New("timeout")
+	}
+}
+
 func TestServerCreateStream(t *testing.T) {
 	s := New()
+	defer s.Close()
 
 	s.CreateStream("test")
 
@@ -37,6 +47,7 @@ func TestServerCreateStream(t *testing.T) {
 
 func TestServerCreateExistingStream(t *testing.T) {
 	s := New()
+	defer s.Close()
 
 	s.CreateStream("test")
 
@@ -50,6 +61,7 @@ func TestServerCreateExistingStream(t *testing.T) {
 
 func TestServerRemoveStream(t *testing.T) {
 	s := New()
+	defer s.Close()
 
 	s.CreateStream("test")
 	s.RemoveStream("test")
@@ -59,6 +71,7 @@ func TestServerRemoveStream(t *testing.T) {
 
 func TestServerRemoveNonExistentStream(t *testing.T) {
 	s := New()
+	defer s.Close()
 
 	s.RemoveStream("test")
 
@@ -67,6 +80,7 @@ func TestServerRemoveNonExistentStream(t *testing.T) {
 
 func TestServerExistingStreamPublish(t *testing.T) {
 	s := New()
+	defer s.Close()
 
 	s.CreateStream("test")
 	stream := s.getStream("test")
@@ -81,6 +95,7 @@ func TestServerExistingStreamPublish(t *testing.T) {
 
 func TestServerNonExistentStreamPublish(t *testing.T) {
 	s := New()
+	defer s.Close()
 
 	s.RemoveStream("test")
 

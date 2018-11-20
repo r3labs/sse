@@ -18,6 +18,7 @@ import (
 func TestStreamAddSubscriber(t *testing.T) {
 	s := newStream(1024, true)
 	s.run()
+	defer s.close()
 
 	s.event <- &Event{Data: []byte("test")}
 	sub := s.addSubscriber("0")
@@ -35,6 +36,7 @@ func TestStreamAddSubscriber(t *testing.T) {
 func TestStreamRemoveSubscriber(t *testing.T) {
 	s := newStream(1024, true)
 	s.run()
+	defer s.close()
 
 	s.addSubscriber("0")
 	time.Sleep(time.Millisecond * 100)
@@ -46,6 +48,7 @@ func TestStreamRemoveSubscriber(t *testing.T) {
 func TestStreamSubscriberClose(t *testing.T) {
 	s := newStream(1024, true)
 	s.run()
+	defer s.close()
 
 	sub := s.addSubscriber("0")
 	sub.close()
@@ -57,6 +60,7 @@ func TestStreamSubscriberClose(t *testing.T) {
 func TestStreamDisableAutoReplay(t *testing.T) {
 	s := newStream(1024, true)
 	s.run()
+	defer s.close()
 
 	s.AutoReplay = false
 	s.event <- &Event{Data: []byte("test")}

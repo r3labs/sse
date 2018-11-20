@@ -15,35 +15,41 @@ import (
 )
 
 var url string
+var srv *Server
 var server *httptest.Server
 
-func setup() {
+func setup(empty bool) {
 	// New Server
-	s := New()
+	srv = New()
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/events", s.HTTPHandler)
+	mux.HandleFunc("/events", srv.HTTPHandler)
 	server = httptest.NewServer(mux)
 	url = server.URL + "/events"
 
-	s.CreateStream("test")
+	srv.CreateStream("test")
 
 	// Send continuous string of events to the client
 	go func(s *Server) {
 		for {
-			s.Publish("test", &Event{Data: []byte("ping")})
+			if empty {
+				s.Publish("test", &Event{Data: []byte("")})
+			} else {
+				s.Publish("test", &Event{Data: []byte("ping")})
+			}
 			time.Sleep(time.Millisecond * 50)
 		}
-	}(s)
+	}(srv)
 }
 
 func cleanup() {
 	server.CloseClientConnections()
 	server.Close()
+	srv.Close()
 }
 
 func TestClientSubscribe(t *testing.T) {
-	setup()
+	setup(false)
 	defer cleanup()
 
 	c := NewClient(url)
@@ -68,8 +74,24 @@ func TestClientSubscribe(t *testing.T) {
 	assert.Nil(t, cErr)
 }
 
+func TestClientChanSubscribeEmptyMessage(t *testing.T) {
+	setup(true)
+	defer cleanup()
+
+	c := NewClient(url)
+
+	events := make(chan *Event)
+	err := c.SubscribeChan("test", events)
+	require.Nil(t, err)
+
+	for i := 0; i < 5; i++ {
+		_, err := waitEvent(events, time.Second)
+		require.NotNil(t, err)
+	}
+}
+
 func TestClientChanSubscribe(t *testing.T) {
-	setup()
+	setup(false)
 	defer cleanup()
 
 	c := NewClient(url)
@@ -91,7 +113,7 @@ func TestClientChanSubscribe(t *testing.T) {
 }
 
 func TestClientOnDisconnect(t *testing.T) {
-	setup()
+	setup(false)
 	defer cleanup()
 
 	c := NewClient(url)
@@ -110,7 +132,7 @@ func TestClientOnDisconnect(t *testing.T) {
 }
 
 func TestClientChanReconnect(t *testing.T) {
-	setup()
+	setup(false)
 	defer cleanup()
 
 	c := NewClient(url)
@@ -136,7 +158,7 @@ func TestClientChanReconnect(t *testing.T) {
 }
 
 func TestClientUnsubscribe(t *testing.T) {
-	setup()
+	setup(false)
 	defer cleanup()
 
 	c := NewClient(url)
