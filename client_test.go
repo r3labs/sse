@@ -33,7 +33,7 @@ func setup(empty bool) {
 	go func(s *Server) {
 		for {
 			if empty {
-				s.Publish("test", &Event{Data: []byte("")})
+				s.Publish("test", &Event{Data: []byte("\n")})
 			} else {
 				s.Publish("test", &Event{Data: []byte("ping")})
 			}
