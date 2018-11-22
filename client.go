@@ -251,21 +251,16 @@ func (c *Client) processEvent(msg []byte) (event *Event, err error) {
 	// Trim the last "\n" per the spec.
 	e.Data = bytes.TrimSuffix(e.Data, []byte("\n"))
 
-	if len(e.Data) > 0 {
-		if c.EncodingBase64 {
-			buf := make([]byte, base64.StdEncoding.DecodedLen(len(e.Data)))
+	if c.EncodingBase64 {
+		buf := make([]byte, base64.StdEncoding.DecodedLen(len(e.Data)))
 
-			_, err := base64.StdEncoding.Decode(buf, e.Data)
-			if err != nil {
-				err = fmt.Errorf("failed to decode event message: %s", err)
-			}
-			e.Data = buf
+		_, err := base64.StdEncoding.Decode(buf, e.Data)
+		if err != nil {
+			err = fmt.Errorf("failed to decode event message: %s", err)
 		}
-		return &e, err
+		e.Data = buf
 	}
-
-	// If we made it here, then the event had a problem.
-	return nil, errors.New("invalid event message")
+	return &e, err
 }
 
 func (c *Client) cleanup(resp *http.Response, ch chan *Event) {
@@ -290,7 +285,7 @@ func trimHeader(size int, data []byte) []byte {
 		data = data[1:]
 	}
 	// Remove trailing new line
-	if data[len(data)-1] == 10 {
+	if len(data) > 0 && data[len(data)-1] == 10 {
 		data = data[:len(data)-1]
 	}
 	return data
