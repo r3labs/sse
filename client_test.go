@@ -86,7 +86,7 @@ func TestClientChanSubscribeEmptyMessage(t *testing.T) {
 
 	for i := 0; i < 5; i++ {
 		_, err := waitEvent(events, time.Second)
-		require.NotNil(t, err)
+		require.Nil(t, err)
 	}
 }
 
