@@ -8,7 +8,8 @@ import (
 	"bytes"
 	"encoding/base64"
 	"errors"
-	"log"
+	"fmt"
+	"io"
 	"net/http"
 	"sync"
 	"time"
@@ -23,6 +24,9 @@ var (
 	headerRetry = []byte("retry:")
 )
 
+// ConnCallback defines a function to be called on a particular connection event
+type ConnCallback func(c *Client)
+
 // Client handles an incoming server stream
 type Client struct {
 	URL            string
@@ -32,6 +36,7 @@ type Client struct {
 	Headers        map[string]string
 	EncodingBase64 bool
 	EventID        string
+	disconnectcb   ConnCallback
 	mu             sync.Mutex
 }
 
@@ -60,25 +65,28 @@ func (c *Client) Subscribe(stream string, handler func(msg *Event)) error {
 			// Read each new line and process the type of event
 			event, err := reader.ReadEvent()
 			if err != nil {
+				if err == io.EOF {
+					return nil
+				}
+
+				// run user specified disconnect function
+				if c.disconnectcb != nil {
+					c.disconnectcb(c)
+				}
+
 				return err
 			}
 
-			if len(event) < 1 {
-				continue
-			}
+			// If we get an error, ignore it.
+			if msg, err := c.processEvent(event); err == nil {
+				if len(msg.ID) > 0 {
+					c.EventID = string(msg.ID)
+				} else {
+					msg.ID = []byte(c.EventID)
+				}
 
-			msg := c.processEvent(event)
-			if msg == nil {
-				continue
+				handler(msg)
 			}
-
-			if len(msg.ID) > 0 {
-				c.EventID = string(msg.ID)
-			} else {
-				msg.ID = []byte(c.EventID)
-			}
-
-			handler(msg)
 		}
 	}
 	return backoff.Retry(operation, backoff.NewExponentialBackOff())
@@ -86,61 +94,75 @@ func (c *Client) Subscribe(stream string, handler func(msg *Event)) error {
 
 // SubscribeChan sends all events to the provided channel
 func (c *Client) SubscribeChan(stream string, ch chan *Event) error {
+	var connected bool
+	errch := make(chan error)
 	c.subscribed[ch] = make(chan bool)
 
-	operation := func() error {
-		resp, err := c.request(stream)
-		if err != nil {
-			c.cleanup(resp, ch)
-			return err
-		}
+	go func() {
+		operation := func() error {
+			resp, err := c.request(stream)
+			if err != nil {
+				c.cleanup(resp, ch)
+				return err
+			}
 
-		if resp.StatusCode != 200 {
-			c.cleanup(resp, ch)
-			return errors.New("could not connect to stream")
-		}
+			if resp.StatusCode != 200 {
+				c.cleanup(resp, ch)
+				return errors.New("could not connect to stream")
+			}
 
-		reader := NewEventStreamReader(resp.Body)
+			if !connected {
+				errch <- nil
+				connected = true
+			}
 
-		go func() {
-			defer resp.Body.Close()
+			reader := NewEventStreamReader(resp.Body)
+
 			for {
 				// Read each new line and process the type of event
 				event, err := reader.ReadEvent()
 				if err != nil {
-					c.cleanup(resp, ch)
-					return
+					if err == io.EOF {
+						c.cleanup(resp, ch)
+						return nil
+					}
+
+					// run user specified disconnect function
+					if c.disconnectcb != nil {
+						c.disconnectcb(c)
+					}
+
+					return err
 				}
 
-				if len(event) < 1 {
-					continue
-				}
+				// If we get an error, ignore it.
+				if msg, err := c.processEvent(event); err == nil {
+					if len(msg.ID) > 0 {
+						c.EventID = string(msg.ID)
+					} else {
+						msg.ID = []byte(c.EventID)
+					}
 
-				msg := c.processEvent(event)
-				if msg == nil {
-					continue
-				}
-
-				if len(msg.ID) > 0 {
-					c.EventID = string(msg.ID)
-				} else {
-					msg.ID = []byte(c.EventID)
-				}
-
-				select {
-				case <-c.subscribed[ch]:
-					c.cleanup(resp, ch)
-					return
-				case ch <- msg:
-					// message sent
+					select {
+					case <-c.subscribed[ch]:
+						c.cleanup(resp, ch)
+						return nil
+					case ch <- msg:
+						// message sent
+					}
 				}
 			}
-		}()
+		}
 
-		return nil
-	}
+		err := backoff.Retry(operation, backoff.NewExponentialBackOff())
+		if err != nil && !connected {
+			errch <- err
+		}
+	}()
+	err := <-errch
+	close(errch)
 
-	return backoff.Retry(operation, backoff.NewExponentialBackOff())
+	return err
 }
 
 // SubscribeRaw to an sse endpoint
@@ -161,6 +183,11 @@ func (c *Client) Unsubscribe(ch chan *Event) {
 	if c.subscribed[ch] != nil {
 		c.subscribed[ch] <- true
 	}
+}
+
+// OnDisconnect specifies the function to run when the connection disconnects
+func (c *Client) OnDisconnect(fn ConnCallback) {
+	c.disconnectcb = fn
 }
 
 func (c *Client) request(stream string) (*http.Response, error) {
@@ -192,8 +219,12 @@ func (c *Client) request(stream string) (*http.Response, error) {
 	return c.Connection.Do(req)
 }
 
-func (c *Client) processEvent(msg []byte) *Event {
+func (c *Client) processEvent(msg []byte) (event *Event, err error) {
 	var e Event
+
+	if len(msg) < 1 {
+		return nil, errors.New("event message was empty")
+	}
 
 	// Normalize the crlf to lf to make it easier to split the lines.
 	bytes.Replace(msg, []byte("\n\r"), []byte("\n"), -1)
@@ -213,31 +244,23 @@ func (c *Client) processEvent(msg []byte) *Event {
 		case bytes.HasPrefix(line, headerRetry):
 			e.Retry = trimHeader(len(headerRetry), line)
 		default:
-			return nil
+			// Ignore any garbage that doesn't match what we're looking for.
 		}
 	}
 
 	// Trim the last "\n" per the spec.
 	e.Data = bytes.TrimSuffix(e.Data, []byte("\n"))
 
-	if len(e.Data) > 0 {
-		if c.EncodingBase64 {
-			buf := make([]byte, base64.StdEncoding.DecodedLen(len(e.Data)))
+	if c.EncodingBase64 {
+		buf := make([]byte, base64.StdEncoding.DecodedLen(len(e.Data)))
 
-			_, err := base64.StdEncoding.Decode(buf, e.Data)
-			if err != nil {
-				// TODO: We shouldn't be printing stuff from this library.
-				// Change this to return an error.
-				log.Println(err)
-			}
-
-			e.Data = buf
+		_, err := base64.StdEncoding.Decode(buf, e.Data)
+		if err != nil {
+			err = fmt.Errorf("failed to decode event message: %s", err)
 		}
-		return &e
+		e.Data = buf
 	}
-
-	// If we made it here, then the event had a problem, so just return an empty event.
-	return new(Event)
+	return &e, err
 }
 
 func (c *Client) cleanup(resp *http.Response, ch chan *Event) {
@@ -262,7 +285,7 @@ func trimHeader(size int, data []byte) []byte {
 		data = data[1:]
 	}
 	// Remove trailing new line
-	if data[len(data)-1] == 10 {
+	if len(data) > 0 && data[len(data)-1] == 10 {
 		data = data[:len(data)-1]
 	}
 	return data

@@ -7,28 +7,20 @@ package sse
 import (
 	"testing"
 
-	. "github.com/smartystreets/goconvey/convey"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestEventLog(t *testing.T) {
-	Convey("Given a new eventlog", t, func() {
-		// New EventLog
-		ev := make(EventLog, 0)
-		testEvent := &Event{Data: []byte("test")}
+	ev := make(EventLog, 0)
+	testEvent := &Event{Data: []byte("test")}
 
-		Convey("When clearing the eventlog", func() {
-			ev.Add(testEvent)
-			ev.Clear()
+	ev.Add(testEvent)
+	ev.Clear()
 
-			Convey("It should be empty", func() {
-				So(len(ev), ShouldEqual, 0)
-			})
+	assert.Equal(t, 0, len(ev))
 
-			Convey("It should be able to be populated again", func() {
-				ev.Add(testEvent)
-				ev.Add(testEvent)
-				So(len(ev), ShouldEqual, 2)
-			})
-		})
-	})
+	ev.Add(testEvent)
+	ev.Add(testEvent)
+
+	assert.Equal(t, 2, len(ev))
 }

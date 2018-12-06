@@ -10,89 +10,165 @@ import (
 	"testing"
 	"time"
 
-	. "github.com/smartystreets/goconvey/convey"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var url string
+var srv *Server
+var server *httptest.Server
 
-func setup() {
+func setup(empty bool) {
 	// New Server
-	s := New()
+	srv = New()
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/events", s.HTTPHandler)
-	server := httptest.NewServer(mux)
+	mux.HandleFunc("/events", srv.HTTPHandler)
+	server = httptest.NewServer(mux)
 	url = server.URL + "/events"
 
-	s.CreateStream("test")
+	srv.CreateStream("test")
 
 	// Send continuous string of events to the client
 	go func(s *Server) {
 		for {
-			s.Publish("test", &Event{Data: []byte("ping")})
+			if empty {
+				s.Publish("test", &Event{Data: []byte("\n")})
+			} else {
+				s.Publish("test", &Event{Data: []byte("ping")})
+			}
 			time.Sleep(time.Millisecond * 50)
 		}
-	}(s)
+	}(srv)
 }
 
-func TestClient(t *testing.T) {
-	setup()
+func cleanup() {
+	server.CloseClientConnections()
+	server.Close()
+	srv.Close()
+}
 
-	Convey("Given a new Subscribe Client", t, func() {
-		c := NewClient(url)
+func TestClientSubscribe(t *testing.T) {
+	setup(false)
+	defer cleanup()
 
-		Convey("When connecting to a new stream", func() {
-			Convey("It should receive events ", func() {
-				events := make(chan *Event)
-				var cErr error
-				go func() {
-					cErr = c.Subscribe("test", func(msg *Event) {
-						if msg.Data != nil {
-							events <- msg
-							return
-						}
-					})
-				}()
+	c := NewClient(url)
 
-				for i := 0; i < 5; i++ {
-					msg, err := wait(events, time.Second*1)
-					So(err, ShouldBeNil)
-					So(string(msg), ShouldEqual, "ping")
-				}
-				So(cErr, ShouldBeNil)
-			})
-		})
-	})
-
-	Convey("Given a new Chan Subscribe Client", t, func() {
-		c := NewClient(url)
-
-		Convey("It should receive events", func() {
-			events := make(chan *Event)
-			err := c.SubscribeChan("test", events)
-			So(err, ShouldBeNil)
-
-			for i := 0; i < 5; i++ {
-				msg, merr := wait(events, time.Second*1)
-				if msg == nil {
-					i--
-					continue
-				}
-				So(merr, ShouldBeNil)
-				So(string(msg), ShouldEqual, "ping")
+	events := make(chan *Event)
+	var cErr error
+	go func() {
+		cErr = c.Subscribe("test", func(msg *Event) {
+			if msg.Data != nil {
+				events <- msg
+				return
 			}
-			c.Unsubscribe(events)
 		})
+	}()
 
-		Convey("It should shutdown gracefully", func() {
-			events := make(chan *Event)
-			err := c.SubscribeChan("test", events)
-			So(err, ShouldBeNil)
+	for i := 0; i < 5; i++ {
+		msg, err := wait(events, time.Second*1)
+		require.Nil(t, err)
+		assert.Equal(t, []byte(`ping`), msg)
+	}
 
-			time.Sleep(time.Millisecond * 500)
+	assert.Nil(t, cErr)
+}
 
-			go c.Unsubscribe(events)
-			go c.Unsubscribe(events)
-		})
+func TestClientChanSubscribeEmptyMessage(t *testing.T) {
+	setup(true)
+	defer cleanup()
+
+	c := NewClient(url)
+
+	events := make(chan *Event)
+	err := c.SubscribeChan("test", events)
+	require.Nil(t, err)
+
+	for i := 0; i < 5; i++ {
+		_, err := waitEvent(events, time.Second)
+		require.Nil(t, err)
+	}
+}
+
+func TestClientChanSubscribe(t *testing.T) {
+	setup(false)
+	defer cleanup()
+
+	c := NewClient(url)
+
+	events := make(chan *Event)
+	err := c.SubscribeChan("test", events)
+	require.Nil(t, err)
+
+	for i := 0; i < 5; i++ {
+		msg, merr := wait(events, time.Second*1)
+		if msg == nil {
+			i--
+			continue
+		}
+		assert.Nil(t, merr)
+		assert.Equal(t, []byte(`ping`), msg)
+	}
+	c.Unsubscribe(events)
+}
+
+func TestClientOnDisconnect(t *testing.T) {
+	setup(false)
+	defer cleanup()
+
+	c := NewClient(url)
+
+	called := make(chan bool)
+	c.OnDisconnect(func(client *Client) {
+		called <- true
 	})
+
+	go c.Subscribe("test", func(msg *Event) {})
+
+	time.Sleep(time.Second)
+	server.CloseClientConnections()
+
+	assert.True(t, <-called)
+}
+
+func TestClientChanReconnect(t *testing.T) {
+	setup(false)
+	defer cleanup()
+
+	c := NewClient(url)
+
+	events := make(chan *Event)
+	err := c.SubscribeChan("test", events)
+	require.Nil(t, err)
+
+	for i := 0; i < 10; i++ {
+		if i == 5 {
+			// kill connection
+			server.CloseClientConnections()
+		}
+		msg, merr := wait(events, time.Second*1)
+		if msg == nil {
+			i--
+			continue
+		}
+		assert.Nil(t, merr)
+		assert.Equal(t, []byte(`ping`), msg)
+	}
+	c.Unsubscribe(events)
+}
+
+func TestClientUnsubscribe(t *testing.T) {
+	setup(false)
+	defer cleanup()
+
+	c := NewClient(url)
+
+	events := make(chan *Event)
+	err := c.SubscribeChan("test", events)
+	require.Nil(t, err)
+
+	time.Sleep(time.Millisecond * 500)
+
+	go c.Unsubscribe(events)
+	go c.Unsubscribe(events)
 }
