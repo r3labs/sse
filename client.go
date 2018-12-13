@@ -96,7 +96,9 @@ func (c *Client) Subscribe(stream string, handler func(msg *Event)) error {
 func (c *Client) SubscribeChan(stream string, ch chan *Event) error {
 	var connected bool
 	errch := make(chan error)
+	c.mu.Lock()
 	c.subscribed[ch] = make(chan bool)
+	c.mu.Unlock()
 
 	go func() {
 		operation := func() error {
