@@ -30,7 +30,7 @@ The messaging system is started when running:
 
 ```go
 func main() {
-    server := sse.New()
+	server := sse.New()
 }
 ```
 
@@ -38,8 +38,8 @@ To add a stream to this handler:
 
 ```go
 func main() {
-    server := sse.New()
-    server.CreateStream("messages")
+	server := sse.New()
+	server.CreateStream("messages")
 }
 ```
 
@@ -55,9 +55,9 @@ In order to start the http server:
 
 ```go
 func main() {
-    server := sse.New()
+	server := sse.New()
 
-    // Create a new Mux and set the handler
+	// Create a new Mux and set the handler
 	mux := http.NewServeMux()
 	mux.HandleFunc("/events", server.HTTPHandler)
 
@@ -69,12 +69,12 @@ To publish messages to a stream:
 
 ```go
 func main() {
-    server := sse.New()
+	server := sse.New()
 
-    // Publish a payload to the stream
-    server.Publish("messages", &sse.Event{
-        Data: []byte("ping"),
-    })
+	// Publish a payload to the stream
+	server.Publish("messages", &sse.Event{
+		Data: []byte("ping"),
+	})
 }
 ```
 
@@ -89,7 +89,7 @@ To create a new client:
 
 ```go
 func main() {
-    client := sse.NewClient("http://server/events")
+	client := sse.NewClient("http://server/events")
 }
 ```
 
@@ -97,12 +97,12 @@ To subscribe to an event stream, please use the Subscribe function. This accepts
 
 ```go
 func main() {
-    client := sse.NewClient("http://server/events")
+	client := sse.NewClient("http://server/events")
 
-    client.Subscribe("messages", func(msg *sse.Event) {
-        // Got some data!
-        fmt.Println(msg.Data)
-    })
+	client.Subscribe("messages", func(msg *sse.Event) {
+		// Got some data!
+		fmt.Println(msg.Data)
+	})
 }
 ```
 
@@ -112,10 +112,10 @@ If you wish to have events sent to a channel, you can use SubscribeChan:
 
 ```go
 func main() {
-    events := make(chan *sse.Event)
+	events := make(chan *sse.Event)
 
-    client := sse.NewClient("http://server/events")
-    client.SubscribeChan("messages", events)
+	client := sse.NewClient("http://server/events")
+	client.SubscribeChan("messages", events)
 }
 ```
 
@@ -125,8 +125,8 @@ To add additional parameters to the http client, such as disabling ssl verificat
 
 ```go
 func main() {
-    client := sse.NewClient("http://server/events")
-    client.Connection.Transport =  &http.Transport{
+	client := sse.NewClient("http://server/events")
+	client.Connection.Transport =  &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
 }
@@ -140,10 +140,10 @@ To set custom query parameters on the client or disable the stream parameter alt
 func main() {
 	client := sse.NewClient("http://server/events?search=example")
 
-    client.SubscribeRaw(func(msg *sse.Event) {
-        // Got some data!
-        fmt.Println(msg.Data)
-    })
+	client.SubscribeRaw(func(msg *sse.Event) {
+		// Got some data!
+		fmt.Println(msg.Data)
+	})
 }
 ```
 

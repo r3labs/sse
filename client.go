@@ -275,7 +275,6 @@ func (c *Client) cleanup(resp *http.Response, ch chan *Event) {
 
 	if c.subscribed[ch] != nil {
 		close(c.subscribed[ch])
-		close(ch)
 		delete(c.subscribed, ch)
 	}
 }
