@@ -7,6 +7,7 @@ package sse
 import (
 	"fmt"
 	"net/http"
+	"time"
 )
 
 // HTTPHandler serves new connections with events for a given stream ...
@@ -64,6 +65,11 @@ func (s *Server) HTTPHandler(w http.ResponseWriter, r *http.Request) {
 			// If the data buffer is an empty string abort.
 			if len(ev.Data) == 0 {
 				break
+			}
+
+			// if the event has expired, dont send it
+			if s.EventTTL != 0 && time.Now().After(ev.timestamp.Add(s.EventTTL)) {
+				continue
 			}
 
 			fmt.Fprintf(w, "id: %s\n", ev.ID)

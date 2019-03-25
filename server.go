@@ -7,6 +7,7 @@ package sse
 import (
 	"encoding/base64"
 	"sync"
+	"time"
 )
 
 // DefaultBufferSize size of the queue that holds the streams messages.
@@ -19,10 +20,13 @@ type Server struct {
 	// Enables creation of a stream when a client connects
 	AutoStream bool
 	// Enables automatic replay for each new subscriber that connects
-	AutoReplay   bool
+	AutoReplay bool
+	// Encodes all data as base64
 	EncodeBase64 bool
-	Streams      map[string]*Stream
-	mu           sync.Mutex
+	// Sets a ttl that prevents old events from being transmitted
+	EventTTL time.Duration
+	Streams  map[string]*Stream
+	mu       sync.Mutex
 }
 
 // New will create a server and setup defaults
