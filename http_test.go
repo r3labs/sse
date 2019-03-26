@@ -120,3 +120,41 @@ func TestHTTPStreamHandlerEventID(t *testing.T) {
 	require.Nil(t, err)
 	assert.Equal(t, []byte("test 3"), msg)
 }
+
+func TestHTTPStreamHandlerEventTTL(t *testing.T) {
+	s := New()
+	defer s.Close()
+
+	s.EventTTL = time.Second * 1
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/events", s.HTTPHandler)
+	server := httptest.NewServer(mux)
+
+	s.CreateStream("test")
+
+	s.Publish("test", &Event{Data: []byte("test 1")})
+	s.Publish("test", &Event{Data: []byte("test 2")})
+	time.Sleep(time.Second * 2)
+	s.Publish("test", &Event{Data: []byte("test 3")})
+
+	time.Sleep(time.Millisecond * 100)
+
+	c := NewClient(server.URL + "/events")
+
+	events := make(chan *Event)
+	var cErr error
+	go func() {
+		cErr = c.Subscribe("test", func(msg *Event) {
+			if len(msg.Data) > 0 {
+				events <- msg
+			}
+		})
+	}()
+
+	require.Nil(t, cErr)
+
+	msg, err := wait(events, time.Millisecond*500)
+	require.Nil(t, err)
+	assert.Equal(t, []byte("test 3"), msg)
+}
