@@ -29,15 +29,16 @@ type ConnCallback func(c *Client)
 
 // Client handles an incoming server stream
 type Client struct {
-	URL            string
-	Connection     *http.Client
-	Retry          time.Time
-	subscribed     map[chan *Event]chan bool
-	Headers        map[string]string
-	EncodingBase64 bool
-	EventID        string
-	disconnectcb   ConnCallback
-	mu             sync.Mutex
+	URL               string
+	Connection        *http.Client
+	Retry             time.Time
+	subscribed        map[chan *Event]chan bool
+	Headers           map[string]string
+	EncodingBase64    bool
+	EventID           string
+	disconnectcb      ConnCallback
+	ReconnectStrategy backoff.BackOff
+	mu                sync.Mutex
 }
 
 // NewClient creates a new client
@@ -89,7 +90,15 @@ func (c *Client) Subscribe(stream string, handler func(msg *Event)) error {
 			}
 		}
 	}
-	return backoff.Retry(operation, backoff.NewExponentialBackOff())
+	
+	// Apply user specified reconnection strategy or default to standard NewExponentialBackOff() reconnection method
+	var err error
+	if c.ReconnectStrategy != nil {
+		err = backoff.Retry(operation, c.ReconnectStrategy)
+	} else {
+		err = backoff.Retry(operation, backoff.NewExponentialBackOff())
+	}
+	return err
 }
 
 // SubscribeChan sends all events to the provided channel
@@ -156,7 +165,13 @@ func (c *Client) SubscribeChan(stream string, ch chan *Event) error {
 			}
 		}
 
-		err := backoff.Retry(operation, backoff.NewExponentialBackOff())
+		// Apply user specified reconnection strategy or default to standard NewExponentialBackOff() reconnection method
+		var err error
+		if c.ReconnectStrategy != nil {
+			err = backoff.Retry(operation, c.ReconnectStrategy)
+		} else {
+			err = backoff.Retry(operation, backoff.NewExponentialBackOff())
+		}
 		if err != nil && !connected {
 			errch <- err
 		}
