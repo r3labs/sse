@@ -158,3 +158,29 @@ func TestHTTPStreamHandlerEventTTL(t *testing.T) {
 	require.Nil(t, err)
 	assert.Equal(t, []byte("test 3"), msg)
 }
+
+func TestHTTPStreamHandlerHeaderFlushIfNoEvents(t *testing.T) {
+	s := New()
+	defer s.Close()
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/events", s.HTTPHandler)
+	server := httptest.NewServer(mux)
+
+	s.CreateStream("test")
+
+	c := NewClient(server.URL + "/events")
+
+	subscribed := make(chan bool)
+	events := make(chan *Event)
+	go func() {
+		assert.NoError(t, c.SubscribeChan("test", events))
+		subscribed <- true
+	}()
+
+	select {
+	case <-subscribed:
+	case <-time.After(100 * time.Millisecond):
+		assert.Fail(t, "Subscribe should returned in 100 milliseconds")
+	}
+}
