@@ -53,7 +53,7 @@ func (s *Server) HTTPHandler(w http.ResponseWriter, r *http.Request) {
 		<-notify
 		sub.close()
 	}()
-
+	flusher.Flush()
 	// Push events to client
 	for {
 		select {
