@@ -6,6 +6,7 @@ package sse
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -53,8 +54,13 @@ func NewClient(url string) *Client {
 
 // Subscribe to a data stream
 func (c *Client) Subscribe(stream string, handler func(msg *Event)) error {
+	return c.SubscribeWithContext(context.Background(), stream, handler)
+}
+
+// Subscribe to a data stream with context
+func (c *Client) SubscribeWithContext(ctx context.Context, stream string, handler func(msg *Event)) error {
 	operation := func() error {
-		resp, err := c.request(stream)
+		resp, err := c.request(ctx, stream)
 		if err != nil {
 			return err
 		}
@@ -90,7 +96,7 @@ func (c *Client) Subscribe(stream string, handler func(msg *Event)) error {
 			}
 		}
 	}
-	
+
 	// Apply user specified reconnection strategy or default to standard NewExponentialBackOff() reconnection method
 	var err error
 	if c.ReconnectStrategy != nil {
@@ -103,6 +109,11 @@ func (c *Client) Subscribe(stream string, handler func(msg *Event)) error {
 
 // SubscribeChan sends all events to the provided channel
 func (c *Client) SubscribeChan(stream string, ch chan *Event) error {
+	return c.SubscribeChanWithContext(context.Background(), stream, ch)
+}
+
+// SubscribeChan sends all events to the provided channel with context
+func (c *Client) SubscribeChanWithContext(ctx context.Context, stream string, ch chan *Event) error {
 	var connected bool
 	errch := make(chan error)
 	c.mu.Lock()
@@ -111,7 +122,7 @@ func (c *Client) SubscribeChan(stream string, ch chan *Event) error {
 
 	go func() {
 		operation := func() error {
-			resp, err := c.request(stream)
+			resp, err := c.request(ctx, stream)
 			if err != nil {
 				c.cleanup(resp, ch)
 				return err
@@ -187,9 +198,19 @@ func (c *Client) SubscribeRaw(handler func(msg *Event)) error {
 	return c.Subscribe("", handler)
 }
 
+// SubscribeRaw to an sse endpoint with context
+func (c *Client) SubscribeRawWithContext(ctx context.Context, handler func(msg *Event)) error {
+	return c.SubscribeWithContext(ctx, "", handler)
+}
+
 // SubscribeChanRaw sends all events to the provided channel
 func (c *Client) SubscribeChanRaw(ch chan *Event) error {
 	return c.SubscribeChan("", ch)
+}
+
+// SubscribeChanRaw sends all events to the provided channel with context
+func (c *Client) SubscribeChanRawWithContext(ctx context.Context, ch chan *Event) error {
+	return c.SubscribeChanWithContext(ctx, "", ch)
 }
 
 // Unsubscribe unsubscribes a channel
@@ -207,11 +228,12 @@ func (c *Client) OnDisconnect(fn ConnCallback) {
 	c.disconnectcb = fn
 }
 
-func (c *Client) request(stream string) (*http.Response, error) {
+func (c *Client) request(ctx context.Context, stream string) (*http.Response, error) {
 	req, err := http.NewRequest("GET", c.URL, nil)
 	if err != nil {
 		return nil, err
 	}
+	req = req.WithContext(ctx)
 
 	// Setup request, specify stream to connect to
 	if stream != "" {
