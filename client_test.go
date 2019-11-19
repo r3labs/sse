@@ -20,6 +20,17 @@ var server *httptest.Server
 
 func setup(empty bool) {
 	// New Server
+	srv = newServer()
+	// Send almost-continuous string of events to the client
+	go publishMsgs(srv, empty, 100000000)
+}
+
+func setupCount(empty bool, count int) {
+	srv = newServer()
+	go publishMsgs(srv, empty, count)
+}
+
+func newServer() *Server {
 	srv = New()
 
 	mux := http.NewServeMux()
@@ -29,17 +40,18 @@ func setup(empty bool) {
 
 	srv.CreateStream("test")
 
-	// Send continuous string of events to the client
-	go func(s *Server) {
-		for {
-			if empty {
-				s.Publish("test", &Event{Data: []byte("\n")})
-			} else {
-				s.Publish("test", &Event{Data: []byte("ping")})
-			}
-			time.Sleep(time.Millisecond * 50)
+	return srv
+}
+
+func publishMsgs(s *Server, empty bool, count int) {
+	for a := 0; a < count; a++ {
+		if empty {
+			s.Publish("test", &Event{Data: []byte("\n")})
+		} else {
+			s.Publish("test", &Event{Data: []byte("ping")})
 		}
-	}(srv)
+		time.Sleep(time.Millisecond * 50)
+	}
 }
 
 func cleanup() {
@@ -171,4 +183,33 @@ func TestClientUnsubscribe(t *testing.T) {
 
 	go c.Unsubscribe(events)
 	go c.Unsubscribe(events)
+}
+
+func TestClientUnsubscribeNonBlock(t *testing.T) {
+	count := 2
+	setupCount(false, count)
+	defer cleanup()
+
+	c := NewClient(url)
+
+	events := make(chan *Event)
+	err := c.SubscribeChan("test", events)
+	require.Nil(t, err)
+
+	// Read count messages from the channel
+	for i := 0; i < count; i++ {
+		msg, merr := wait(events, time.Second*1)
+		assert.Nil(t, merr)
+		assert.Equal(t, []byte(`ping`), msg)
+	}
+	//No more data is available to be read in the channel
+	// Make sure Unsubscribe returns quickly
+	doneCh := make(chan *Event)
+	go func() {
+		var e Event
+		c.Unsubscribe(events)
+		doneCh <- &e
+	}()
+	_, merr := wait(doneCh, time.Millisecond*100)
+	assert.Nil(t, merr)
 }
