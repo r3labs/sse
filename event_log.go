@@ -27,7 +27,8 @@ func (e *EventLog) Clear() {
 // Replay events to a subscriber
 func (e *EventLog) Replay(s *Subscriber) {
 	for i := 0; i < len((*e)); i++ {
-		if string((*e)[i].ID) >= s.eventid {
+		id, _ := strconv.Atoi(string((*e)[i].ID))
+		if id >= s.eventid {
 			s.connection <- (*e)[i]
 		}
 	}

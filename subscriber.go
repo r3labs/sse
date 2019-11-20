@@ -6,7 +6,7 @@ package sse
 
 // Subscriber ...
 type Subscriber struct {
-	eventid    string
+	eventid    int
 	quit       chan *Subscriber
 	connection chan *Event
 }

@@ -87,7 +87,7 @@ func (str *Stream) getSubIndex(sub *Subscriber) int {
 }
 
 // addSubscriber will create a new subscriber on a stream
-func (str *Stream) addSubscriber(eventid string) *Subscriber {
+func (str *Stream) addSubscriber(eventid int) *Subscriber {
 	sub := &Subscriber{
 		eventid:    eventid,
 		quit:       str.deregister,
