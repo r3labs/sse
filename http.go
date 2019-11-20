@@ -7,6 +7,7 @@ package sse
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 )
 
@@ -39,9 +40,14 @@ func (s *Server) HTTPHandler(w http.ResponseWriter, r *http.Request) {
 		stream = s.CreateStream(streamID)
 	}
 
-	eventid := r.Header.Get("Last-Event-ID")
-	if eventid == "" {
-		eventid = "0"
+	eventid := 0
+	if id := r.Header.Get("Last-Event-ID"); id != "" {
+		var err error
+		eventid, err = strconv.Atoi(id)
+		if err != nil {
+			http.Error(w, "Last-Event-ID must be a number!", http.StatusBadRequest)
+			return
+		}
 	}
 
 	// Create the stream subscriber
