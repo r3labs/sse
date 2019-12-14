@@ -21,7 +21,7 @@ func TestStreamAddSubscriber(t *testing.T) {
 	defer s.close()
 
 	s.event <- &Event{Data: []byte("test")}
-	sub := s.addSubscriber("0")
+	sub := s.addSubscriber(0)
 
 	assert.Equal(t, 1, len(s.subscribers))
 
@@ -38,7 +38,7 @@ func TestStreamRemoveSubscriber(t *testing.T) {
 	s.run()
 	defer s.close()
 
-	s.addSubscriber("0")
+	s.addSubscriber(0)
 	time.Sleep(time.Millisecond * 100)
 	s.removeSubscriber(0)
 
@@ -50,7 +50,7 @@ func TestStreamSubscriberClose(t *testing.T) {
 	s.run()
 	defer s.close()
 
-	sub := s.addSubscriber("0")
+	sub := s.addSubscriber(0)
 	sub.close()
 	time.Sleep(time.Millisecond * 100)
 
@@ -65,7 +65,7 @@ func TestStreamDisableAutoReplay(t *testing.T) {
 	s.AutoReplay = false
 	s.event <- &Event{Data: []byte("test")}
 	time.Sleep(time.Millisecond * 100)
-	sub := s.addSubscriber("0")
+	sub := s.addSubscriber(0)
 
 	assert.Equal(t, 0, len(sub.connection))
 }
@@ -77,7 +77,7 @@ func TestStreamMultipleSubscribers(t *testing.T) {
 	s.run()
 
 	for i := 0; i < 10; i++ {
-		subs = append(subs, s.addSubscriber("0"))
+		subs = append(subs, s.addSubscriber(0))
 	}
 
 	// Wait for all subscribers to be added
