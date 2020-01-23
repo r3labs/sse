@@ -57,7 +57,7 @@ func (c *Client) Subscribe(stream string, handler func(msg *Event)) error {
 	return c.SubscribeWithContext(context.Background(), stream, handler)
 }
 
-// Subscribe to a data stream with context
+// SubscribeWithContext to a data stream with context
 func (c *Client) SubscribeWithContext(ctx context.Context, stream string, handler func(msg *Event)) error {
 	operation := func() error {
 		resp, err := c.request(ctx, stream)
@@ -94,7 +94,7 @@ func (c *Client) SubscribeChan(stream string, ch chan *Event) error {
 	return c.SubscribeChanWithContext(context.Background(), stream, ch)
 }
 
-// SubscribeChan sends all events to the provided channel with context
+// SubscribeChanWithContext sends all events to the provided channel with context
 func (c *Client) SubscribeChanWithContext(ctx context.Context, stream string, ch chan *Event) error {
 	var connected bool
 	errch := make(chan error)
@@ -207,7 +207,7 @@ func (c *Client) SubscribeRaw(handler func(msg *Event)) error {
 	return c.Subscribe("", handler)
 }
 
-// SubscribeRaw to an sse endpoint with context
+// SubscribeRawWithContext to an sse endpoint with context
 func (c *Client) SubscribeRawWithContext(ctx context.Context, handler func(msg *Event)) error {
 	return c.SubscribeWithContext(ctx, "", handler)
 }
@@ -217,7 +217,7 @@ func (c *Client) SubscribeChanRaw(ch chan *Event) error {
 	return c.SubscribeChan("", ch)
 }
 
-// SubscribeChanRaw sends all events to the provided channel with context
+// SubscribeChanRawWithContext sends all events to the provided channel with context
 func (c *Client) SubscribeChanRawWithContext(ctx context.Context, ch chan *Event) error {
 	return c.SubscribeChanWithContext(ctx, "", ch)
 }
