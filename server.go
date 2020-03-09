@@ -26,6 +26,7 @@ type Server struct {
 	// Sets a ttl that prevents old events from being transmitted
 	EventTTL time.Duration
 	Streams  map[string]*Stream
+	Headers  map[string]string
 	mu       sync.Mutex
 }
 
@@ -36,6 +37,9 @@ func New() *Server {
 		AutoStream: false,
 		AutoReplay: true,
 		Streams:    make(map[string]*Stream),
+		Headers: map[string]string{
+			"Access-Control-Allow-Origin": "*",
+		},
 	}
 }
 

@@ -22,7 +22,10 @@ func (s *Server) HTTPHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	for k, v := range s.Headers {
+		w.Header().Set(k, v)
+	}
 
 	// Get the StreamID from the URL
 	streamID := r.URL.Query().Get("stream")
