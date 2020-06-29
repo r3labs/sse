@@ -39,6 +39,7 @@ type Client struct {
 	EventID           string
 	disconnectcb      ConnCallback
 	ReconnectStrategy backoff.BackOff
+	ReconnectNotify   backoff.Notify
 	mu                sync.Mutex
 }
 
@@ -150,9 +151,9 @@ func (c *Client) SubscribeChanWithContext(ctx context.Context, stream string, ch
 		// Apply user specified reconnection strategy or default to standard NewExponentialBackOff() reconnection method
 		var err error
 		if c.ReconnectStrategy != nil {
-			err = backoff.Retry(operation, c.ReconnectStrategy)
+			err = backoff.RetryNotify(operation, c.ReconnectStrategy, c.ReconnectNotify)
 		} else {
-			err = backoff.Retry(operation, backoff.NewExponentialBackOff())
+			err = backoff.RetryNotify(operation, backoff.NewExponentialBackOff(), c.ReconnectNotify)
 		}
 
 		// channel closed once connected
