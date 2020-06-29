@@ -28,6 +28,8 @@ var (
 // ConnCallback defines a function to be called on a particular connection event
 type ConnCallback func(c *Client)
 
+type ResponseValidator func(c *Client, resp *http.Response) error
+
 // Client handles an incoming server stream
 type Client struct {
 	URL               string
@@ -38,6 +40,7 @@ type Client struct {
 	EncodingBase64    bool
 	EventID           string
 	disconnectcb      ConnCallback
+	ResponseValidator ResponseValidator
 	ReconnectStrategy backoff.BackOff
 	ReconnectNotify   backoff.Notify
 	mu                sync.Mutex
@@ -64,6 +67,12 @@ func (c *Client) SubscribeWithContext(ctx context.Context, stream string, handle
 		resp, err := c.request(ctx, stream)
 		if err != nil {
 			return err
+		}
+		if validator := c.ResponseValidator; validator != nil {
+			err = validator(c, resp)
+			if err != nil {
+				return err
+			}
 		}
 		defer resp.Body.Close()
 
