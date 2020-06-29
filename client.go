@@ -28,6 +28,8 @@ var (
 // ConnCallback defines a function to be called on a particular connection event
 type ConnCallback func(c *Client)
 
+type ResponseValidator func(c *Client, resp *http.Response) error
+
 // Client handles an incoming server stream
 type Client struct {
 	URL               string
@@ -38,7 +40,9 @@ type Client struct {
 	EncodingBase64    bool
 	EventID           string
 	disconnectcb      ConnCallback
+	ResponseValidator ResponseValidator
 	ReconnectStrategy backoff.BackOff
+	ReconnectNotify   backoff.Notify
 	mu                sync.Mutex
 }
 
@@ -64,6 +68,12 @@ func (c *Client) SubscribeWithContext(ctx context.Context, stream string, handle
 		if err != nil {
 			return err
 		}
+		if validator := c.ResponseValidator; validator != nil {
+			err = validator(c, resp)
+			if err != nil {
+				return err
+			}
+		}
 		defer resp.Body.Close()
 
 		reader := NewEventStreamReader(resp.Body)
@@ -82,9 +92,9 @@ func (c *Client) SubscribeWithContext(ctx context.Context, stream string, handle
 	// Apply user specified reconnection strategy or default to standard NewExponentialBackOff() reconnection method
 	var err error
 	if c.ReconnectStrategy != nil {
-		err = backoff.Retry(operation, c.ReconnectStrategy)
+		err = backoff.RetryNotify(operation, c.ReconnectStrategy, c.ReconnectNotify)
 	} else {
-		err = backoff.Retry(operation, backoff.NewExponentialBackOff())
+		err = backoff.RetryNotify(operation, backoff.NewExponentialBackOff(), c.ReconnectNotify)
 	}
 	return err
 }
@@ -150,9 +160,9 @@ func (c *Client) SubscribeChanWithContext(ctx context.Context, stream string, ch
 		// Apply user specified reconnection strategy or default to standard NewExponentialBackOff() reconnection method
 		var err error
 		if c.ReconnectStrategy != nil {
-			err = backoff.Retry(operation, c.ReconnectStrategy)
+			err = backoff.RetryNotify(operation, c.ReconnectStrategy, c.ReconnectNotify)
 		} else {
-			err = backoff.Retry(operation, backoff.NewExponentialBackOff())
+			err = backoff.RetryNotify(operation, backoff.NewExponentialBackOff(), c.ReconnectNotify)
 		}
 
 		// channel closed once connected
