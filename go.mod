@@ -1,4 +1,4 @@
-module github.com/r3labs/sse
+module github.com/foolenough/sse
 
 go 1.13
 
