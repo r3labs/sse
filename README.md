@@ -1,4 +1,4 @@
-# SSE - Server Side Events Client/Server Library for Go
+# SSE - Server Side Events Client/Server Library for Golang
 
 ## Synopsis
 
