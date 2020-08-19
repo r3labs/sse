@@ -290,7 +290,7 @@ func (c *Client) processEvent(msg []byte) (event *Event, err error) {
 	for _, line := range bytes.FieldsFunc(msg, func(r rune) bool { return r == '\n' || r == '\r' }) {
 		switch {
 		case bytes.HasPrefix(line, headerID):
-			e.ID = trimHeader(len(headerID), line)
+			e.ID = append([]byte(nil), trimHeader(len(headerID), line)...)
 		case bytes.HasPrefix(line, headerData):
 			// The spec allows for multiple data fields per event, concatenated them with "\n".
 			e.Data = append(append(trimHeader(len(headerData), line), e.Data[:]...), byte('\n'))
@@ -298,9 +298,9 @@ func (c *Client) processEvent(msg []byte) (event *Event, err error) {
 		case bytes.Equal(line, bytes.TrimSuffix(headerData, []byte(":"))):
 			e.Data = append(e.Data, byte('\n'))
 		case bytes.HasPrefix(line, headerEvent):
-			e.Event = trimHeader(len(headerEvent), line)
+			e.Event = append([]byte(nil), trimHeader(len(headerEvent), line)...)
 		case bytes.HasPrefix(line, headerRetry):
-			e.Retry = trimHeader(len(headerRetry), line)
+			e.Retry = append([]byte(nil), trimHeader(len(headerRetry), line)...)
 		default:
 			// Ignore any garbage that doesn't match what we're looking for.
 		}
