@@ -73,6 +73,8 @@ func (c *Client) SubscribeWithContext(ctx context.Context, stream string, handle
 			if err != nil {
 				return err
 			}
+		} else if resp.StatusCode != 200 {
+			return errors.New("could not connect to stream")
 		}
 		defer resp.Body.Close()
 
@@ -117,11 +119,15 @@ func (c *Client) SubscribeChanWithContext(ctx context.Context, stream string, ch
 		if err != nil {
 			return err
 		}
-		defer resp.Body.Close()
-
-		if resp.StatusCode != 200 {
+		if validator := c.ResponseValidator; validator != nil {
+			err = validator(c, resp)
+			if err != nil {
+				return err
+			}
+		} else if resp.StatusCode != 200 {
 			return errors.New("could not connect to stream")
 		}
+		defer resp.Body.Close()
 
 		if !connected {
 			// Notify connect
