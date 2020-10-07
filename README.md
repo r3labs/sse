@@ -2,18 +2,19 @@
 
 ## Synopsis
 
-SSE is a client/server implementation for Server Side Events for Golang. Right now functionality is basic, but there is support for multiple separate streams with many clients connected to each. The client is able to specify the stream it wants to connect to by the URL parameter _stream_.
+SSE is a client/server implementation for Server Side Events for Golang.
 
 ## Build status
 
-* Master: [![CircleCI  Master](https://circleci.com/gh/r3labs/sse/tree/master.svg?style=svg)](https://circleci.com/gh/r3labs/sse/tree/master)
+* Master: [![CircleCI  Master](https://circleci.com/gh/r3labs/sse/tree/v2.svg?style=svg)](https://circleci.com/gh/r3labs/sse/tree/v2)
+
+NOTE: All active development now takes place on the v2 branch.
 
 ## Quick start
 
-To install:
-
-```sh
-$ go get github.com/r3labs/sse
+To install version 2:
+```
+go get github.com/r3labs/sse/v2
 ```
 
 To Test:
