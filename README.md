@@ -1,8 +1,8 @@
-# SSE - Server Side Events Client/Server Library for Go
+# SSE - Server Sent Events Client/Server Library for Go
 
 ## Synopsis
 
-SSE is a client/server implementation for Server Side Events for Golang.
+SSE is a client/server implementation for Server Sent Events for Golang.
 
 ## Build status
 
