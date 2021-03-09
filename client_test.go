@@ -5,6 +5,7 @@
 package sse
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -12,6 +13,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	backoff "gopkg.in/cenkalti/backoff.v1"
 )
 
 var url string
@@ -35,6 +38,22 @@ func newServer() *Server {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/events", srv.HTTPHandler)
+	server = httptest.NewServer(mux)
+	url = server.URL + "/events"
+
+	srv.CreateStream("test")
+
+	return srv
+}
+
+func newServer401() *Server {
+	srv = New()
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/events", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+	})
+
 	server = httptest.NewServer(mux)
 	url = server.URL + "/events"
 
@@ -212,4 +231,26 @@ func TestClientUnsubscribeNonBlock(t *testing.T) {
 	}()
 	_, merr := wait(doneCh, time.Millisecond*100)
 	assert.Nil(t, merr)
+}
+
+func TestClientUnsubscribe401(t *testing.T) {
+	srv = newServer401()
+	defer cleanup()
+
+	c := NewClient(url)
+
+	// limit retries to 3
+	c.ReconnectStrategy = backoff.WithMaxTries(
+		backoff.NewExponentialBackOff(),
+		3,
+	)
+
+	err := c.SubscribeRaw(func(ev *Event) {
+		// this shouldn't run
+		assert.False(t, true)
+	})
+
+	fmt.Println(err)
+
+	require.NotNil(t, err)
 }
