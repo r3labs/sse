@@ -25,9 +25,11 @@ type Server struct {
 	EncodeBase64 bool
 	// Sets a ttl that prevents old events from being transmitted
 	EventTTL time.Duration
-	Streams  map[string]*Stream
-	Headers  map[string]string
-	mu       sync.Mutex
+	// Splits an events data into multiple data: entries
+	SplitData bool
+	Streams   map[string]*Stream
+	Headers   map[string]string
+	mu        sync.Mutex
 }
 
 // New will create a server and setup defaults
