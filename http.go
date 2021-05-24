@@ -5,6 +5,7 @@
 package sse
 
 import (
+	"bytes"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -82,14 +83,26 @@ func (s *Server) HTTPHandler(w http.ResponseWriter, r *http.Request) {
 			}
 
 			fmt.Fprintf(w, "id: %s\n", ev.ID)
-			fmt.Fprintf(w, "data: %s\n", ev.Data)
+
+			if s.SplitData {
+				sd := bytes.Split(ev.Data, []byte("\n"))
+				for i := range sd {
+					fmt.Fprintf(w, "data: %s\n", sd[i])
+				}
+			} else {
+				fmt.Fprintf(w, "data: %s\n", ev.Data)
+			}
+
 			if len(ev.Event) > 0 {
 				fmt.Fprintf(w, "event: %s\n", ev.Event)
 			}
+
 			if len(ev.Retry) > 0 {
 				fmt.Fprintf(w, "retry: %s\n", ev.Retry)
 			}
+
 			fmt.Fprint(w, "\n")
+
 			flusher.Flush()
 		}
 	}

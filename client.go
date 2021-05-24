@@ -300,7 +300,7 @@ func (c *Client) processEvent(msg []byte) (event *Event, err error) {
 			e.ID = append([]byte(nil), trimHeader(len(headerID), line)...)
 		case bytes.HasPrefix(line, headerData):
 			// The spec allows for multiple data fields per event, concatenated them with "\n".
-			e.Data = append(append(trimHeader(len(headerData), line), e.Data[:]...), byte('\n'))
+			e.Data = append(e.Data[:], append(trimHeader(len(headerData), line), byte('\n'))...)
 		// The spec says that a line that simply contains the string "data" should be treated as a data field with an empty body.
 		case bytes.Equal(line, bytes.TrimSuffix(headerData, []byte(":"))):
 			e.Data = append(e.Data, byte('\n'))
