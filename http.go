@@ -58,11 +58,11 @@ func (s *Server) HTTPHandler(w http.ResponseWriter, r *http.Request) {
 	sub := stream.addSubscriber(eventid)
 	defer sub.close()
 
-	notify := w.(http.CloseNotifier).CloseNotify()
 	go func() {
-		<-notify
+		<-r.Context().Done()
 		sub.close()
 	}()
+
 	flusher.Flush()
 	// Push events to client
 	for {
