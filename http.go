@@ -56,7 +56,6 @@ func (s *Server) HTTPHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Create the stream subscriber
 	sub := stream.addSubscriber(eventid)
-	defer sub.close()
 
 	go func() {
 		<-r.Context().Done()
@@ -65,45 +64,39 @@ func (s *Server) HTTPHandler(w http.ResponseWriter, r *http.Request) {
 
 	flusher.Flush()
 	// Push events to client
-	for {
-		select {
-		case ev, ok := <-sub.connection:
-			if !ok {
-				return
-			}
+	for ev := range sub.connection {
 
-			// If the data buffer is an empty string abort.
-			if len(ev.Data) == 0 {
-				break
-			}
-
-			// if the event has expired, dont send it
-			if s.EventTTL != 0 && time.Now().After(ev.timestamp.Add(s.EventTTL)) {
-				continue
-			}
-
-			fmt.Fprintf(w, "id: %s\n", ev.ID)
-
-			if s.SplitData {
-				sd := bytes.Split(ev.Data, []byte("\n"))
-				for i := range sd {
-					fmt.Fprintf(w, "data: %s\n", sd[i])
-				}
-			} else {
-				fmt.Fprintf(w, "data: %s\n", ev.Data)
-			}
-
-			if len(ev.Event) > 0 {
-				fmt.Fprintf(w, "event: %s\n", ev.Event)
-			}
-
-			if len(ev.Retry) > 0 {
-				fmt.Fprintf(w, "retry: %s\n", ev.Retry)
-			}
-
-			fmt.Fprint(w, "\n")
-
-			flusher.Flush()
+		// If the data buffer is an empty string abort.
+		if len(ev.Data) == 0 {
+			break
 		}
+
+		// if the event has expired, dont send it
+		if s.EventTTL != 0 && time.Now().After(ev.timestamp.Add(s.EventTTL)) {
+			continue
+		}
+
+		fmt.Fprintf(w, "id: %s\n", ev.ID)
+
+		if s.SplitData {
+			sd := bytes.Split(ev.Data, []byte("\n"))
+			for i := range sd {
+				fmt.Fprintf(w, "data: %s\n", sd[i])
+			}
+		} else {
+			fmt.Fprintf(w, "data: %s\n", ev.Data)
+		}
+
+		if len(ev.Event) > 0 {
+			fmt.Fprintf(w, "event: %s\n", ev.Event)
+		}
+
+		if len(ev.Retry) > 0 {
+			fmt.Fprintf(w, "retry: %s\n", ev.Retry)
+		}
+
+		fmt.Fprint(w, "\n")
+
+		flusher.Flush()
 	}
 }
