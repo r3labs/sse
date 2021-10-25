@@ -231,6 +231,52 @@ func (c *Client) SubscribeRawWithContext(ctx context.Context, handler func(msg *
 	return c.SubscribeWithContext(ctx, "", handler)
 }
 
+// SubscribeWithCustomRequest to an sse endpoint
+func (c *Client) SubscribeWithCustomRequest(reqFactory func(ctx context.Context, conn *http.Client, stream string) (*http.Response, error), handler func(msg *Event)) error {
+	return c.SubscribeWithCustomRequestWithContext(reqFactory, context.Background(), handler)
+}
+
+// SubscribeWithCustomRequestWithContext to an sse endpoint with context
+func (c *Client) SubscribeWithCustomRequestWithContext(reqFactory func(ctx context.Context, conn *http.Client, stream string) (*http.Response, error), ctx context.Context, handler func(msg *Event)) error {
+	operation := func() error {
+		resp, err := reqFactory(ctx, c.Connection, stream)
+		if err != nil {
+			return err
+		}
+		if validator := c.ResponseValidator; validator != nil {
+			err = validator(c, resp)
+			if err != nil {
+				return err
+			}
+		} else if resp.StatusCode != 200 {
+			resp.Body.Close()
+			return fmt.Errorf("could not connect to stream: %s", http.StatusText(resp.StatusCode))
+		}
+		defer resp.Body.Close()
+
+		reader := NewEventStreamReader(resp.Body)
+		eventChan, errorChan := c.startReadLoop(reader)
+
+		for {
+			select {
+			case err := <-errorChan:
+				return err
+			case msg := <-eventChan:
+				handler(msg)
+			}
+		}
+	}
+
+	// Apply user specified reconnection strategy or default to standard NewExponentialBackOff() reconnection method
+	var err error
+	if c.ReconnectStrategy != nil {
+		err = backoff.RetryNotify(operation, c.ReconnectStrategy, c.ReconnectNotify)
+	} else {
+		err = backoff.RetryNotify(operation, backoff.NewExponentialBackOff(), c.ReconnectNotify)
+	}
+	return err
+}
+
 // SubscribeChanRaw sends all events to the provided channel
 func (c *Client) SubscribeChanRaw(ch chan *Event) error {
 	return c.SubscribeChan("", ch)
