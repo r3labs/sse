@@ -39,9 +39,7 @@ func New() *Server {
 		AutoStream: false,
 		AutoReplay: true,
 		Streams:    make(map[string]*Stream),
-		Headers: map[string]string{
-			"Access-Control-Allow-Origin": "*",
-		},
+		Headers: map[string]string{},
 	}
 }
 
