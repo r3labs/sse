@@ -12,8 +12,8 @@ import (
 	"time"
 )
 
-// HTTPHandler serves new connections with events for a given stream ...
-func (s *Server) HTTPHandler(w http.ResponseWriter, r *http.Request) {
+// ServeHTTP serves new connections with events for a given stream ...
+func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	flusher, err := w.(http.Flusher)
 	if !err {
 		http.Error(w, "Streaming unsupported!", http.StatusInternalServerError)
