@@ -61,7 +61,12 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	go func() {
 		<-r.Context().Done()
+
 		sub.close()
+
+		if s.AutoStream && len(stream.subscribers) == 0 {
+			s.RemoveStream(streamID)
+		}
 	}()
 
 	flusher.Flush()
