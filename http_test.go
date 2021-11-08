@@ -20,7 +20,7 @@ func TestHTTPStreamHandler(t *testing.T) {
 	defer s.Close()
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/events", s.HTTPHandler)
+	mux.HandleFunc("/events", s.ServeHTTP)
 	server := httptest.NewServer(mux)
 
 	s.CreateStream("test")
@@ -53,7 +53,7 @@ func TestHTTPStreamHandlerExistingEvents(t *testing.T) {
 	defer s.Close()
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/events", s.HTTPHandler)
+	mux.HandleFunc("/events", s.ServeHTTP)
 	server := httptest.NewServer(mux)
 
 	s.CreateStream("test")
@@ -90,7 +90,7 @@ func TestHTTPStreamHandlerEventID(t *testing.T) {
 	defer s.Close()
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/events", s.HTTPHandler)
+	mux.HandleFunc("/events", s.ServeHTTP)
 	server := httptest.NewServer(mux)
 
 	s.CreateStream("test")
@@ -128,7 +128,7 @@ func TestHTTPStreamHandlerEventTTL(t *testing.T) {
 	s.EventTTL = time.Second * 1
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/events", s.HTTPHandler)
+	mux.HandleFunc("/events", s.ServeHTTP)
 	server := httptest.NewServer(mux)
 
 	s.CreateStream("test")
@@ -164,7 +164,7 @@ func TestHTTPStreamHandlerHeaderFlushIfNoEvents(t *testing.T) {
 	defer s.Close()
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/events", s.HTTPHandler)
+	mux.HandleFunc("/events", s.ServeHTTP)
 	server := httptest.NewServer(mux)
 
 	s.CreateStream("test")

@@ -52,7 +52,7 @@ func newServer() *Server {
 	srv = New()
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/events", srv.HTTPHandler)
+	mux.HandleFunc("/events", srv.ServeHTTP)
 	server = httptest.NewServer(mux)
 	url = server.URL + "/events"
 
