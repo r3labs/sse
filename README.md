@@ -81,6 +81,27 @@ func main() {
 
 Please note there must be a stream with the name you specify and there must be subscribers to that stream
 
+A way to detect disconnected clients:
+
+```go
+func main() {
+	server := sse.New()
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/events", func(w http.ResponseWriter, r *http.Request) {
+		go func() {
+			// Received Browser Disconnection
+			<-ctx.Done()
+			println("The client is disconnected here")
+			return
+		}()
+
+		server.ServeHTTP(w, r)
+	})
+
+	http.ListenAndServe(":8080", mux)
+}
+```
 
 #### Example Client
 
