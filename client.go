@@ -341,6 +341,11 @@ func (c *Client) cleanup(ch chan *Event) {
 }
 
 func trimHeader(size int, data []byte) []byte {
+	
+	if data == nil || len(data) < size {
+		return data
+	}
+	
 	data = data[size:]
 	// Remove optional leading whitespace
 	if data[0] == 32 {
