@@ -63,9 +63,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	flusher.Flush()
+
 	// Push events to client
 	for ev := range sub.connection {
-
 		// If the data buffer is an empty string abort.
 		if len(ev.Data) == 0 {
 			break
@@ -84,7 +84,11 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				fmt.Fprintf(w, "data: %s\n", sd[i])
 			}
 		} else {
-			fmt.Fprintf(w, "data: %s\n", ev.Data)
+			if bytes.HasPrefix(ev.Data, []byte(":")) {
+				fmt.Fprintf(w, "%s\n", ev.Data)
+			} else {
+				fmt.Fprintf(w, "data: %s\n", ev.Data)
+			}
 		}
 
 		if len(ev.Event) > 0 {
