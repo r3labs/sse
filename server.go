@@ -39,7 +39,7 @@ func New() *Server {
 		AutoStream: false,
 		AutoReplay: true,
 		Streams:    make(map[string]*Stream),
-		Headers: map[string]string{},
+		Headers:    map[string]string{},
 	}
 }
 
@@ -63,7 +63,7 @@ func (s *Server) CreateStream(id string) *Stream {
 		return s.Streams[id]
 	}
 
-	str := newStream(s.BufferSize, s.AutoReplay)
+	str := newStream(s.BufferSize, s.AutoReplay, s.AutoStream)
 	str.run()
 
 	s.Streams[id] = str
