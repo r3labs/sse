@@ -184,3 +184,44 @@ func TestHTTPStreamHandlerHeaderFlushIfNoEvents(t *testing.T) {
 		assert.Fail(t, "Subscribe should returned in 100 milliseconds")
 	}
 }
+
+func TestHTTPStreamHandlerAutoStream(t *testing.T) {
+	t.Parallel()
+
+	sseServer := New()
+	defer sseServer.Close()
+
+	sseServer.AutoReplay = false
+
+	sseServer.AutoStream = true
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/events", sseServer.ServeHTTP)
+	server := httptest.NewServer(mux)
+
+	c := NewClient(server.URL + "/events")
+
+	events := make(chan *Event)
+
+	cErr := make(chan error)
+
+	go func() {
+		cErr <- c.SubscribeChan("test", events)
+	}()
+
+	require.Nil(t, <-cErr)
+
+	sseServer.Publish("test", &Event{Data: []byte("test")})
+
+	msg, err := wait(events, 1*time.Second)
+
+	require.Nil(t, err)
+
+	assert.Equal(t, []byte(`test`), msg)
+
+	c.Unsubscribe(events)
+
+	_, _ = wait(events, 1*time.Second)
+
+	assert.Equal(t, (*Stream)(nil), sseServer.getStream("test"))
+}
