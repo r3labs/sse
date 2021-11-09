@@ -18,6 +18,7 @@ type Stream struct {
 	event           chan *Event
 	quit            chan bool
 	subscriberCount int32
+	isAutoStream    bool
 }
 
 // StreamRegistration ...
@@ -27,15 +28,16 @@ type StreamRegistration struct {
 }
 
 // newStream returns a new stream
-func newStream(bufsize int, replay bool) *Stream {
+func newStream(bufsize int, replay, isAutoStream bool) *Stream {
 	return &Stream{
-		AutoReplay:  replay,
-		subscribers: make([]*Subscriber, 0),
-		register:    make(chan *Subscriber),
-		deregister:  make(chan *Subscriber),
-		event:       make(chan *Event, bufsize),
-		quit:        make(chan bool),
-		Eventlog:    make(EventLog, 0),
+		AutoReplay:   replay,
+		subscribers:  make([]*Subscriber, 0),
+		isAutoStream: isAutoStream,
+		register:     make(chan *Subscriber),
+		deregister:   make(chan *Subscriber),
+		event:        make(chan *Event, bufsize),
+		quit:         make(chan bool),
+		Eventlog:     make(EventLog, 0),
 	}
 }
 
@@ -96,7 +98,10 @@ func (str *Stream) addSubscriber(eventid int) *Subscriber {
 		eventid:    eventid,
 		quit:       str.deregister,
 		connection: make(chan *Event, 64),
-		removed:    make(chan struct{}, 1),
+	}
+
+	if str.isAutoStream {
+		sub.removed = make(chan struct{}, 1)
 	}
 
 	str.register <- sub
@@ -106,16 +111,20 @@ func (str *Stream) addSubscriber(eventid int) *Subscriber {
 func (str *Stream) removeSubscriber(i int) {
 	atomic.AddInt32(&str.subscriberCount, -1)
 	close(str.subscribers[i].connection)
-	str.subscribers[i].removed <- struct{}{}
-	close(str.subscribers[i].removed)
+	if str.subscribers[i].removed != nil {
+		str.subscribers[i].removed <- struct{}{}
+		close(str.subscribers[i].removed)
+	}
 	str.subscribers = append(str.subscribers[:i], str.subscribers[i+1:]...)
 }
 
 func (str *Stream) removeAllSubscribers() {
 	for i := 0; i < len(str.subscribers); i++ {
 		close(str.subscribers[i].connection)
-		str.subscribers[i].removed <- struct{}{}
-		close(str.subscribers[i].removed)
+		if str.subscribers[i].removed != nil {
+			str.subscribers[i].removed <- struct{}{}
+			close(str.subscribers[i].removed)
+		}
 	}
 	atomic.StoreInt32(&str.subscriberCount, 0)
 	str.subscribers = str.subscribers[:0]
