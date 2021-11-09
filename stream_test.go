@@ -23,7 +23,7 @@ func TestStreamAddSubscriber(t *testing.T) {
 	s.event <- &Event{Data: []byte("test")}
 	sub := s.addSubscriber(0)
 
-	assert.Equal(t, 1, len(s.subscribers))
+	assert.Equal(t, 1, s.getSubscriberCount())
 
 	s.event <- &Event{Data: []byte("test")}
 	msg, err := wait(sub.connection, time.Second*1)
@@ -42,7 +42,7 @@ func TestStreamRemoveSubscriber(t *testing.T) {
 	time.Sleep(time.Millisecond * 100)
 	s.removeSubscriber(0)
 
-	assert.Equal(t, 0, len(s.subscribers))
+	assert.Equal(t, 0, s.getSubscriberCount())
 }
 
 func TestStreamSubscriberClose(t *testing.T) {
@@ -54,7 +54,7 @@ func TestStreamSubscriberClose(t *testing.T) {
 	sub.close()
 	time.Sleep(time.Millisecond * 100)
 
-	assert.Equal(t, 0, len(s.subscribers))
+	assert.Equal(t, 0, s.getSubscriberCount())
 }
 
 func TestStreamDisableAutoReplay(t *testing.T) {
@@ -94,6 +94,6 @@ func TestStreamMultipleSubscribers(t *testing.T) {
 
 	// Wait for all subscribers to close
 	time.Sleep(time.Millisecond * 100)
-	assert.Equal(t, 0, len(s.subscribers))
+	assert.Equal(t, 0, s.getSubscriberCount())
 
 }
