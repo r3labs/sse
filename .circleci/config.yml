@@ -1,12 +1,16 @@
+version: 2.1
+
 jobs:
-  setup_lint_test:
+  test:
+    docker:
+      - image: 1.17-alpine:latest
     steps:
       - checkout
       - run: make deps
       - run: make lint
       - run: make test
+
 workflows:
-  version: 2
-  setup_lint_test:
+  build_and_test:
     jobs:
-      - setup_lint_test
+      - test
