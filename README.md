@@ -58,7 +58,7 @@ func main() {
 
 	// Create a new Mux and set the handler
 	mux := http.NewServeMux()
-	mux.HandleFunc("/events", server.HTTPHandler)
+	mux.HandleFunc("/events", server.ServeHTTP)
 
 	http.ListenAndServe(":8080", mux)
 }
