@@ -6,8 +6,6 @@ jobs:
       - image: golang:1.17
     steps:
       - checkout
-      - run: make deps
-      - run: make lint
       - run: make test
 
 workflows:
