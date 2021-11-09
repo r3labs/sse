@@ -191,6 +191,8 @@ func TestHTTPStreamHandlerAutoStream(t *testing.T) {
 	sseServer := New()
 	defer sseServer.Close()
 
+	sseServer.AutoReplay = false
+
 	sseServer.AutoStream = true
 
 	mux := http.NewServeMux()
