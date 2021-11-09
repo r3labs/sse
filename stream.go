@@ -4,17 +4,20 @@
 
 package sse
 
+import "sync/atomic"
+
 // Stream ...
 type Stream struct {
 	// Enables replaying of eventlog to newly added subscribers
-	AutoReplay  bool
-	Eventlog    EventLog
-	stats       chan chan int
-	subscribers []*Subscriber
-	register    chan *Subscriber
-	deregister  chan *Subscriber
-	event       chan *Event
-	quit        chan bool
+	AutoReplay      bool
+	Eventlog        EventLog
+	stats           chan chan int
+	subscribers     []*Subscriber
+	register        chan *Subscriber
+	deregister      chan *Subscriber
+	event           chan *Event
+	quit            chan bool
+	subscriberCount int32
 }
 
 // StreamRegistration ...
@@ -88,6 +91,7 @@ func (str *Stream) getSubIndex(sub *Subscriber) int {
 
 // addSubscriber will create a new subscriber on a stream
 func (str *Stream) addSubscriber(eventid int) *Subscriber {
+	atomic.AddInt32(&str.subscriberCount, 1)
 	sub := &Subscriber{
 		eventid:    eventid,
 		quit:       str.deregister,
@@ -99,6 +103,7 @@ func (str *Stream) addSubscriber(eventid int) *Subscriber {
 }
 
 func (str *Stream) removeSubscriber(i int) {
+	atomic.AddInt32(&str.subscriberCount, -1)
 	close(str.subscribers[i].connection)
 	str.subscribers = append(str.subscribers[:i], str.subscribers[i+1:]...)
 }
@@ -107,5 +112,10 @@ func (str *Stream) removeAllSubscribers() {
 	for i := 0; i < len(str.subscribers); i++ {
 		close(str.subscribers[i].connection)
 	}
+	atomic.StoreInt32(&str.subscriberCount, 0)
 	str.subscribers = str.subscribers[:0]
+}
+
+func (str *Stream) getSubscriberCount() int {
+	return int(atomic.LoadInt32(&str.subscriberCount))
 }
