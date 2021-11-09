@@ -3,7 +3,7 @@ version: 2.1
 jobs:
   test:
     docker:
-      - image: 1.17-alpine:latest
+      - image: golang:1.17-alpine
     steps:
       - checkout
       - run: make deps
