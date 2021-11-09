@@ -1,8 +1,12 @@
-dependencies:
-  pre:
-    - make deps
-
-test:
-  override:
-    - make lint
-    - make test
+jobs:
+  setup_lint_test:
+    steps:
+      - checkout
+      - run: make deps
+      - run: make lint
+      - run: make test
+workflows:
+  version: 2
+  setup_lint_test:
+    jobs:
+      - setup_lint_test
