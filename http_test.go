@@ -201,16 +201,13 @@ func TestHTTPStreamHandlerAutoStream(t *testing.T) {
 
 	events := make(chan *Event)
 
-	var cErr error
+	cErr := make(chan error)
 
 	go func() {
-		cErr = c.SubscribeChan("test", events)
+		cErr <- c.SubscribeChan("test", events)
 	}()
 
-	// Wait for subscriber to be registered and message to be published
-	time.Sleep(1 * time.Second)
-
-	require.Nil(t, cErr)
+	require.Nil(t, <-cErr)
 
 	sseServer.Publish("test", &Event{Data: []byte("test")})
 
@@ -222,7 +219,7 @@ func TestHTTPStreamHandlerAutoStream(t *testing.T) {
 
 	c.Unsubscribe(events)
 
-	time.Sleep(1 * time.Second)
+	_, _ = wait(events, 1*time.Second)
 
 	assert.Equal(t, (*Stream)(nil), sseServer.getStream("test"))
 }
