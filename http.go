@@ -37,10 +37,12 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	stream := s.getStream(streamID)
 
-	if stream == nil && !s.AutoStream {
-		http.Error(w, "Stream not found!", http.StatusInternalServerError)
-		return
-	} else if stream == nil && s.AutoStream {
+	if stream == nil {
+		if !s.AutoStream {
+			http.Error(w, "Stream not found!", http.StatusInternalServerError)
+			return
+		}
+
 		stream = s.CreateStream(streamID)
 	}
 
