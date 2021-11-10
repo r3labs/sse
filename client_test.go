@@ -5,7 +5,8 @@
 package sse
 
 import (
-	"fmt"
+	"crypto/rand"
+	"encoding/hex"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -298,7 +299,37 @@ func TestClientUnsubscribe401(t *testing.T) {
 		assert.False(t, true)
 	})
 
-	fmt.Println(err)
-
 	require.NotNil(t, err)
+}
+
+func TestClientLargeData(t *testing.T) {
+	srv = newServer()
+	defer cleanup()
+
+	c := NewClient(url, ClientMaxBufferSize(1<<19))
+
+	// limit retries to 3
+	c.ReconnectStrategy = backoff.WithMaxTries(
+		backoff.NewExponentialBackOff(),
+		3,
+	)
+
+	// allocate 128KB of data to send
+	data := make([]byte, 1<<17)
+	rand.Read(data)
+	data = []byte(hex.EncodeToString(data))
+
+	ec := make(chan *Event, 1)
+
+	srv.Publish("test", &Event{Data: data})
+
+	go func() {
+		c.Subscribe("test", func(ev *Event) {
+			ec <- ev
+		})
+	}()
+
+	d, err := wait(ec, time.Second)
+	require.Nil(t, err)
+	require.Equal(t, data, d)
 }

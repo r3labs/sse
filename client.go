@@ -25,6 +25,12 @@ var (
 	headerRetry = []byte("retry:")
 )
 
+func ClientMaxBufferSize(s int) func(c *Client) {
+	return func(c *Client) {
+		c.maxBufferSize = s
+	}
+}
+
 // ConnCallback defines a function to be called on a particular connection event
 type ConnCallback func(c *Client)
 
@@ -40,6 +46,7 @@ type Client struct {
 	Headers           map[string]string
 	EncodingBase64    bool
 	EventID           string
+	maxBufferSize     int
 	disconnectcb      ConnCallback
 	ResponseValidator ResponseValidator
 	ReconnectStrategy backoff.BackOff
@@ -48,13 +55,20 @@ type Client struct {
 }
 
 // NewClient creates a new client
-func NewClient(url string) *Client {
-	return &Client{
-		URL:        url,
-		Connection: &http.Client{},
-		Headers:    make(map[string]string),
-		subscribed: make(map[chan *Event]chan bool),
+func NewClient(url string, opts ...func(c *Client)) *Client {
+	c := &Client{
+		URL:           url,
+		Connection:    &http.Client{},
+		Headers:       make(map[string]string),
+		subscribed:    make(map[chan *Event]chan bool),
+		maxBufferSize: 1 << 16,
 	}
+
+	for _, opt := range opts {
+		opt(c)
+	}
+
+	return c
 }
 
 // Subscribe to a data stream
@@ -80,7 +94,7 @@ func (c *Client) SubscribeWithContext(ctx context.Context, stream string, handle
 		}
 		defer resp.Body.Close()
 
-		reader := NewEventStreamReader(resp.Body)
+		reader := NewEventStreamReader(resp.Body, c.maxBufferSize)
 		eventChan, errorChan := c.startReadLoop(reader)
 
 		for {
@@ -138,7 +152,7 @@ func (c *Client) SubscribeChanWithContext(ctx context.Context, stream string, ch
 			connected = true
 		}
 
-		reader := NewEventStreamReader(resp.Body)
+		reader := NewEventStreamReader(resp.Body, c.maxBufferSize)
 		eventChan, errorChan := c.startReadLoop(reader)
 
 		for {
@@ -341,11 +355,10 @@ func (c *Client) cleanup(ch chan *Event) {
 }
 
 func trimHeader(size int, data []byte) []byte {
-	
 	if data == nil || len(data) < size {
 		return data
 	}
-	
+
 	data = data[size:]
 	// Remove optional leading whitespace
 	if data[0] == 32 {
