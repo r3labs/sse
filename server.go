@@ -15,21 +15,21 @@ const DefaultBufferSize = 1024
 
 // Server Is our main struct
 type Server struct {
+	Streams map[string]*Stream
+	Headers map[string]string
+	// Sets a ttl that prevents old events from being transmitted
+	EventTTL time.Duration
 	// Specifies the size of the message buffer for each stream
 	BufferSize int
+	mu         sync.Mutex
+	// Encodes all data as base64
+	EncodeBase64 bool
+	// Splits an events data into multiple data: entries
+	SplitData bool
 	// Enables creation of a stream when a client connects
 	AutoStream bool
 	// Enables automatic replay for each new subscriber that connects
 	AutoReplay bool
-	// Encodes all data as base64
-	EncodeBase64 bool
-	// Sets a ttl that prevents old events from being transmitted
-	EventTTL time.Duration
-	// Splits an events data into multiple data: entries
-	SplitData bool
-	Streams   map[string]*Stream
-	Headers   map[string]string
-	mu        sync.Mutex
 }
 
 // New will create a server and setup defaults

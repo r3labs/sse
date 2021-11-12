@@ -14,11 +14,11 @@ import (
 
 // Event holds all of the event source fields
 type Event struct {
+	timestamp time.Time
 	ID        []byte
 	Data      []byte
 	Event     []byte
 	Retry     []byte
-	timestamp time.Time
 }
 
 // EventStreamReader scans an io.Reader looking for EventStream messages.
