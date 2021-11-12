@@ -16,7 +16,7 @@ type EventLog []*Event
 func (e *EventLog) Add(ev *Event) {
 	ev.ID = []byte(e.currentindex())
 	ev.timestamp = time.Now()
-	(*e) = append((*e), ev)
+	*e = append(*e, ev)
 }
 
 // Clear events from eventlog
@@ -26,7 +26,7 @@ func (e *EventLog) Clear() {
 
 // Replay events to a subscriber
 func (e *EventLog) Replay(s *Subscriber) {
-	for i := 0; i < len((*e)); i++ {
+	for i := 0; i < len(*e); i++ {
 		id, _ := strconv.Atoi(string((*e)[i].ID))
 		if id >= s.eventid {
 			s.connection <- (*e)[i]
@@ -35,5 +35,5 @@ func (e *EventLog) Replay(s *Subscriber) {
 }
 
 func (e *EventLog) currentindex() string {
-	return strconv.Itoa(len((*e)))
+	return strconv.Itoa(len(*e))
 }
