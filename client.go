@@ -39,19 +39,19 @@ type ResponseValidator func(c *Client, resp *http.Response) error
 
 // Client handles an incoming server stream
 type Client struct {
-	URL               string
-	Connection        *http.Client
 	Retry             time.Time
+	ReconnectStrategy backoff.BackOff
+	disconnectcb      ConnCallback
 	subscribed        map[chan *Event]chan bool
 	Headers           map[string]string
-	EncodingBase64    bool
+	ReconnectNotify   backoff.Notify
+	ResponseValidator ResponseValidator
+	Connection        *http.Client
+	URL               string
 	EventID           string
 	maxBufferSize     int
-	disconnectcb      ConnCallback
-	ResponseValidator ResponseValidator
-	ReconnectStrategy backoff.BackOff
-	ReconnectNotify   backoff.Notify
 	mu                sync.Mutex
+	EncodingBase64    bool
 }
 
 // NewClient creates a new client

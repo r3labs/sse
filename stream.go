@@ -8,23 +8,23 @@ import "sync/atomic"
 
 // Stream ...
 type Stream struct {
-	// Enables replaying of eventlog to newly added subscribers
-	AutoReplay      bool
-	Eventlog        EventLog
-	stats           chan chan int
-	subscribers     []*Subscriber
-	register        chan *Subscriber
-	deregister      chan *Subscriber
 	event           chan *Event
 	quit            chan bool
+	stats           chan chan int
+	register        chan *Subscriber
+	deregister      chan *Subscriber
+	subscribers     []*Subscriber
+	Eventlog        EventLog
 	subscriberCount int32
-	isAutoStream    bool
+	// Enables replaying of eventlog to newly added subscribers
+	AutoReplay   bool
+	isAutoStream bool
 }
 
 // StreamRegistration ...
 type StreamRegistration struct {
-	id     string
 	stream *Stream
+	id     string
 }
 
 // newStream returns a new stream
