@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	backoff "gopkg.in/cenkalti/backoff.v1"
+	"gopkg.in/cenkalti/backoff.v1"
 )
 
 var url string
