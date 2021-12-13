@@ -15,7 +15,7 @@ import (
 	"sync"
 	"time"
 
-	backoff "gopkg.in/cenkalti/backoff.v1"
+	"gopkg.in/cenkalti/backoff.v1"
 )
 
 var (
