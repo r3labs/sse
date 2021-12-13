@@ -10,7 +10,6 @@ import "sync/atomic"
 type Stream struct {
 	event           chan *Event
 	quit            chan struct{}
-	stats           chan chan int
 	register        chan *Subscriber
 	deregister      chan *Subscriber
 	subscribers     []*Subscriber
@@ -19,12 +18,6 @@ type Stream struct {
 	// Enables replaying of eventlog to newly added subscribers
 	AutoReplay   bool
 	isAutoStream bool
-}
-
-// StreamRegistration ...
-type StreamRegistration struct {
-	stream *Stream
-	id     string
 }
 
 // newStream returns a new stream

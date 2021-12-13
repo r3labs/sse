@@ -24,8 +24,6 @@ type Event struct {
 // EventStreamReader scans an io.Reader looking for EventStream messages.
 type EventStreamReader struct {
 	scanner *bufio.Scanner
-	buffer  []byte
-	idx     int
 }
 
 // NewEventStreamReader creates an instance of EventStreamReader.
