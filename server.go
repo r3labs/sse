@@ -49,7 +49,7 @@ func (s *Server) Close() {
 	defer s.mu.Unlock()
 
 	for id := range s.Streams {
-		s.Streams[id].quit <- true
+		s.Streams[id].quit <- struct{}{}
 		delete(s.Streams, id)
 	}
 }
