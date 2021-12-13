@@ -1,6 +1,9 @@
 linters:
   enable-all: true
   disable:
+    - gofmt
+    - gofumpt
+    - goimports
     - golint # deprecated
     - interfacer # deprecated
     - maligned # deprecated
