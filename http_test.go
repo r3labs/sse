@@ -171,11 +171,11 @@ func TestHTTPStreamHandlerHeaderFlushIfNoEvents(t *testing.T) {
 
 	c := NewClient(server.URL + "/events")
 
-	subscribed := make(chan bool)
+	subscribed := make(chan struct{})
 	events := make(chan *Event)
 	go func() {
 		assert.NoError(t, c.SubscribeChan("test", events))
-		subscribed <- true
+		subscribed <- struct{}{}
 	}()
 
 	select {

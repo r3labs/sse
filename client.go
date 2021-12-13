@@ -15,7 +15,7 @@ import (
 	"sync"
 	"time"
 
-	backoff "gopkg.in/cenkalti/backoff.v1"
+	"gopkg.in/cenkalti/backoff.v1"
 )
 
 var (
@@ -42,7 +42,7 @@ type Client struct {
 	Retry             time.Time
 	ReconnectStrategy backoff.BackOff
 	disconnectcb      ConnCallback
-	subscribed        map[chan *Event]chan bool
+	subscribed        map[chan *Event]chan struct{}
 	Headers           map[string]string
 	ReconnectNotify   backoff.Notify
 	ResponseValidator ResponseValidator
@@ -60,7 +60,7 @@ func NewClient(url string, opts ...func(c *Client)) *Client {
 		URL:           url,
 		Connection:    &http.Client{},
 		Headers:       make(map[string]string),
-		subscribed:    make(map[chan *Event]chan bool),
+		subscribed:    make(map[chan *Event]chan struct{}),
 		maxBufferSize: 1 << 16,
 	}
 
@@ -127,7 +127,7 @@ func (c *Client) SubscribeChanWithContext(ctx context.Context, stream string, ch
 	var connected bool
 	errch := make(chan error)
 	c.mu.Lock()
-	c.subscribed[ch] = make(chan bool)
+	c.subscribed[ch] = make(chan struct{})
 	c.mu.Unlock()
 
 	operation := func() error {
@@ -261,7 +261,7 @@ func (c *Client) Unsubscribe(ch chan *Event) {
 	defer c.mu.Unlock()
 
 	if c.subscribed[ch] != nil {
-		c.subscribed[ch] <- true
+		c.subscribed[ch] <- struct{}{}
 	}
 }
 

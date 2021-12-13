@@ -9,7 +9,7 @@ import "sync/atomic"
 // Stream ...
 type Stream struct {
 	event           chan *Event
-	quit            chan bool
+	quit            chan struct{}
 	register        chan *Subscriber
 	deregister      chan *Subscriber
 	subscribers     []*Subscriber
@@ -29,7 +29,7 @@ func newStream(bufsize int, replay, isAutoStream bool) *Stream {
 		register:     make(chan *Subscriber),
 		deregister:   make(chan *Subscriber),
 		event:        make(chan *Event, bufsize),
-		quit:         make(chan bool),
+		quit:         make(chan struct{}),
 		Eventlog:     make(EventLog, 0),
 	}
 }
@@ -72,7 +72,7 @@ func (str *Stream) run() {
 }
 
 func (str *Stream) close() {
-	str.quit <- true
+	str.quit <- struct{}{}
 }
 
 func (str *Stream) getSubIndex(sub *Subscriber) int {

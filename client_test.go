@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	backoff "gopkg.in/cenkalti/backoff.v1"
+	"gopkg.in/cenkalti/backoff.v1"
 )
 
 var url string
@@ -198,9 +198,9 @@ func TestClientOnDisconnect(t *testing.T) {
 
 	c := NewClient(url)
 
-	called := make(chan bool)
+	called := make(chan struct{})
 	c.OnDisconnect(func(client *Client) {
-		called <- true
+		called <- struct{}{}
 	})
 
 	go c.Subscribe("test", func(msg *Event) {})
@@ -208,7 +208,7 @@ func TestClientOnDisconnect(t *testing.T) {
 	time.Sleep(time.Second)
 	server.CloseClientConnections()
 
-	assert.True(t, <-called)
+	assert.Equal(t, struct{}{}, <-called)
 }
 
 func TestClientChanReconnect(t *testing.T) {
