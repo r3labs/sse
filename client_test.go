@@ -333,3 +333,28 @@ func TestClientLargeData(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, data, d)
 }
+
+func TestTrimHeader(t *testing.T) {
+	tests := []struct {
+		input []byte
+		want  []byte
+	}{
+		{
+			input: []byte("data: real data"),
+			want:  []byte("real data"),
+		},
+		{
+			input: []byte("data:real data"),
+			want:  []byte("real data"),
+		},
+		{
+			input: []byte("data:"),
+			want:  []byte(""),
+		},
+	}
+
+	for _, tc := range tests {
+		got := trimHeader(len(headerData), tc.input)
+		require.Equal(t, tc.want, got)
+	}
+}
