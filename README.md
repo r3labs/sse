@@ -89,7 +89,7 @@ func main() {
 	mux.HandleFunc("/events", func(w http.ResponseWriter, r *http.Request) {
 		go func() {
 			// Received Browser Disconnection
-			<-ctx.Done()
+			<-r.Context().Done()
 			println("The client is disconnected here")
 			return
 		}()
