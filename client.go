@@ -103,6 +103,8 @@ func (c *Client) SubscribeWithContext(ctx context.Context, stream string, handle
 				return err
 			case msg := <-eventChan:
 				handler(msg)
+			case <- ctx.Done():
+				return ctx.Err()
 			}
 		}
 	}
