@@ -29,7 +29,8 @@ type EventStreamReader struct {
 // NewEventStreamReader creates an instance of EventStreamReader.
 func NewEventStreamReader(eventStream io.Reader, maxBufferSize int) *EventStreamReader {
 	scanner := bufio.NewScanner(eventStream)
-	scanner.Buffer(make([]byte, 4096), maxBufferSize)
+	initBufferSize := minPosInt(4096, maxBufferSize)
+	scanner.Buffer(make([]byte, initBufferSize), maxBufferSize)
 
 	split := func(data []byte, atEOF bool) (int, []byte, error) {
 		if atEOF && len(data) == 0 {
