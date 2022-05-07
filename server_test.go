@@ -45,6 +45,16 @@ func TestServerCreateStream(t *testing.T) {
 	assert.NotNil(t, s.getStream("test"))
 }
 
+func TestServerWithCallback(t *testing.T) {
+	funcA := func() {}
+	funcB := func() {}
+
+	s := NewWithCallback(funcA, funcB)
+	defer s.Close()
+	assert.NotNil(t, s.OnRegister)
+	assert.NotNil(t, s.OnUnRegister)
+}
+
 func TestServerCreateExistingStream(t *testing.T) {
 	s := New()
 	defer s.Close()

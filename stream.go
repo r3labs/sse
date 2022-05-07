@@ -18,10 +18,14 @@ type Stream struct {
 	// Enables replaying of eventlog to newly added subscribers
 	AutoReplay   bool
 	isAutoStream bool
+
+	// Specifies the function to run when client register or un-register
+	OnRegister   func()
+	OnUnRegister func()
 }
 
 // newStream returns a new stream
-func newStream(bufsize int, replay, isAutoStream bool) *Stream {
+func newStream(bufsize int, replay, isAutoStream bool, onRegister, onUnRegister func()) *Stream {
 	return &Stream{
 		AutoReplay:   replay,
 		subscribers:  make([]*Subscriber, 0),
@@ -31,6 +35,8 @@ func newStream(bufsize int, replay, isAutoStream bool) *Stream {
 		event:        make(chan *Event, bufsize),
 		quit:         make(chan struct{}),
 		Eventlog:     make(EventLog, 0),
+		OnRegister:   onRegister,
+		OnUnRegister: onUnRegister,
 	}
 }
 
@@ -45,11 +51,19 @@ func (str *Stream) run() {
 					str.Eventlog.Replay(subscriber)
 				}
 
+				if str.OnRegister != nil {
+					go str.OnRegister()
+				}
+
 			// Remove closed subscriber
 			case subscriber := <-str.deregister:
 				i := str.getSubIndex(subscriber)
 				if i != -1 {
 					str.removeSubscriber(i)
+				}
+
+				if str.OnUnRegister != nil {
+					go str.OnUnRegister()
 				}
 
 			// Publish event to subscribers

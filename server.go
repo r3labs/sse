@@ -30,6 +30,10 @@ type Server struct {
 	AutoStream bool
 	// Enables automatic replay for each new subscriber that connects
 	AutoReplay bool
+
+	// Specifies the function to run when client register or un-register
+	OnRegister   func()
+	OnUnRegister func()
 }
 
 // New will create a server and setup defaults
@@ -40,6 +44,19 @@ func New() *Server {
 		AutoReplay: true,
 		Streams:    make(map[string]*Stream),
 		Headers:    map[string]string{},
+	}
+}
+
+// NewWithCallback will create a server and setup defaults with callback function
+func NewWithCallback(onRegister, onUnRegister func()) *Server {
+	return &Server{
+		BufferSize:   DefaultBufferSize,
+		AutoStream:   false,
+		AutoReplay:   true,
+		Streams:      make(map[string]*Stream),
+		Headers:      map[string]string{},
+		OnRegister:   onRegister,
+		OnUnRegister: onUnRegister,
 	}
 }
 
@@ -63,7 +80,7 @@ func (s *Server) CreateStream(id string) *Stream {
 		return s.Streams[id]
 	}
 
-	str := newStream(s.BufferSize, s.AutoReplay, s.AutoStream)
+	str := newStream(s.BufferSize, s.AutoReplay, s.AutoStream, s.OnRegister, s.OnUnRegister)
 	str.run()
 
 	s.Streams[id] = str
