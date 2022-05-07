@@ -46,8 +46,8 @@ func TestServerCreateStream(t *testing.T) {
 }
 
 func TestServerWithCallback(t *testing.T) {
-	funcA := func() {}
-	funcB := func() {}
+	funcA := func(s *Stream) {}
+	funcB := func(s *Stream) {}
 
 	s := NewWithCallback(funcA, funcB)
 	defer s.Close()
