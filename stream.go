@@ -8,6 +8,7 @@ import "sync/atomic"
 
 // Stream ...
 type Stream struct {
+	ID              string
 	event           chan *Event
 	quit            chan struct{}
 	register        chan *Subscriber
@@ -20,19 +21,20 @@ type Stream struct {
 	isAutoStream bool
 
 	// Specifies the function to run when client register or un-register
-	OnRegister   func()
-	OnUnRegister func()
+	OnRegister   func(*Stream)
+	OnUnRegister func(*Stream)
 }
 
 // newStream returns a new stream
-func newStream(bufsize int, replay, isAutoStream bool, onRegister, onUnRegister func()) *Stream {
+func newStream(id string, buffSize int, replay, isAutoStream bool, onRegister, onUnRegister func(stream *Stream)) *Stream {
 	return &Stream{
+		ID:           id,
 		AutoReplay:   replay,
 		subscribers:  make([]*Subscriber, 0),
 		isAutoStream: isAutoStream,
 		register:     make(chan *Subscriber),
 		deregister:   make(chan *Subscriber),
-		event:        make(chan *Event, bufsize),
+		event:        make(chan *Event, buffSize),
 		quit:         make(chan struct{}),
 		Eventlog:     make(EventLog, 0),
 		OnRegister:   onRegister,
@@ -52,7 +54,7 @@ func (str *Stream) run() {
 				}
 
 				if str.OnRegister != nil {
-					go str.OnRegister()
+					go str.OnRegister(str)
 				}
 
 			// Remove closed subscriber
@@ -63,7 +65,7 @@ func (str *Stream) run() {
 				}
 
 				if str.OnUnRegister != nil {
-					go str.OnUnRegister()
+					go str.OnUnRegister(str)
 				}
 
 			// Publish event to subscribers
