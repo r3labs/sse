@@ -51,8 +51,8 @@ func TestServerWithCallback(t *testing.T) {
 
 	s := NewWithCallback(funcA, funcB)
 	defer s.Close()
-	assert.NotNil(t, s.OnRegister)
-	assert.NotNil(t, s.OnUnRegister)
+	assert.NotNil(t, s.OnSubscribe)
+	assert.NotNil(t, s.OnUnsubscribe)
 }
 
 func TestServerCreateExistingStream(t *testing.T) {

@@ -20,25 +20,25 @@ type Stream struct {
 	AutoReplay   bool
 	isAutoStream bool
 
-	// Specifies the function to run when client register or un-register
-	OnRegister   func(*Stream)
-	OnUnRegister func(*Stream)
+	// Specifies the function to run when client subscribe or un-subscribe
+	OnSubscribe   func(*Stream)
+	OnUnsubscribe func(*Stream)
 }
 
 // newStream returns a new stream
-func newStream(id string, buffSize int, replay, isAutoStream bool, onRegister, onUnRegister func(stream *Stream)) *Stream {
+func newStream(id string, buffSize int, replay, isAutoStream bool, onSubscribe, onUnsubscribe func(stream *Stream)) *Stream {
 	return &Stream{
-		ID:           id,
-		AutoReplay:   replay,
-		subscribers:  make([]*Subscriber, 0),
-		isAutoStream: isAutoStream,
-		register:     make(chan *Subscriber),
-		deregister:   make(chan *Subscriber),
-		event:        make(chan *Event, buffSize),
-		quit:         make(chan struct{}),
-		Eventlog:     make(EventLog, 0),
-		OnRegister:   onRegister,
-		OnUnRegister: onUnRegister,
+		ID:            id,
+		AutoReplay:    replay,
+		subscribers:   make([]*Subscriber, 0),
+		isAutoStream:  isAutoStream,
+		register:      make(chan *Subscriber),
+		deregister:    make(chan *Subscriber),
+		event:         make(chan *Event, buffSize),
+		quit:          make(chan struct{}),
+		Eventlog:      make(EventLog, 0),
+		OnSubscribe:   onSubscribe,
+		OnUnsubscribe: onUnsubscribe,
 	}
 }
 
@@ -53,8 +53,8 @@ func (str *Stream) run() {
 					str.Eventlog.Replay(subscriber)
 				}
 
-				if str.OnRegister != nil {
-					go str.OnRegister(str)
+				if str.OnSubscribe != nil {
+					go str.OnSubscribe(str)
 				}
 
 			// Remove closed subscriber
@@ -64,8 +64,8 @@ func (str *Stream) run() {
 					str.removeSubscriber(i)
 				}
 
-				if str.OnUnRegister != nil {
-					go str.OnUnRegister(str)
+				if str.OnUnsubscribe != nil {
+					go str.OnUnsubscribe(str)
 				}
 
 			// Publish event to subscribers
