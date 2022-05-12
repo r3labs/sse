@@ -32,8 +32,8 @@ type Server struct {
 	AutoReplay bool
 
 	// Specifies the function to run when client subscribe or un-subscribe
-	OnSubscribe   func(str *Stream)
-	OnUnsubscribe func(str *Stream)
+	OnSubscribe   func(streamID string, sub *Subscriber)
+	OnUnsubscribe func(streamID string, sub *Subscriber)
 }
 
 // New will create a server and setup defaults
@@ -48,7 +48,7 @@ func New() *Server {
 }
 
 // NewWithCallback will create a server and setup defaults with callback function
-func NewWithCallback(onSubscribe, onUnsubscribe func(str *Stream)) *Server {
+func NewWithCallback(onSubscribe, onUnsubscribe func(streamID string, sub *Subscriber)) *Server {
 	return &Server{
 		BufferSize:    DefaultBufferSize,
 		AutoStream:    false,
