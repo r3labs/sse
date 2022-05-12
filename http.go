@@ -57,7 +57,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create the stream subscriber
-	sub := stream.addSubscriber(eventid)
+	sub := stream.addSubscriber(eventid, r.URL)
 
 	go func() {
 		<-r.Context().Done()

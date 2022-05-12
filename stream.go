@@ -4,10 +4,14 @@
 
 package sse
 
-import "sync/atomic"
+import (
+	"net/url"
+	"sync/atomic"
+)
 
 // Stream ...
 type Stream struct {
+	ID              string
 	event           chan *Event
 	quit            chan struct{}
 	register        chan *Subscriber
@@ -18,19 +22,26 @@ type Stream struct {
 	// Enables replaying of eventlog to newly added subscribers
 	AutoReplay   bool
 	isAutoStream bool
+
+	// Specifies the function to run when client subscribe or un-subscribe
+	OnSubscribe   func(streamID string, sub *Subscriber)
+	OnUnsubscribe func(streamID string, sub *Subscriber)
 }
 
 // newStream returns a new stream
-func newStream(bufsize int, replay, isAutoStream bool) *Stream {
+func newStream(id string, buffSize int, replay, isAutoStream bool, onSubscribe, onUnsubscribe func(string, *Subscriber)) *Stream {
 	return &Stream{
-		AutoReplay:   replay,
-		subscribers:  make([]*Subscriber, 0),
-		isAutoStream: isAutoStream,
-		register:     make(chan *Subscriber),
-		deregister:   make(chan *Subscriber),
-		event:        make(chan *Event, bufsize),
-		quit:         make(chan struct{}),
-		Eventlog:     make(EventLog, 0),
+		ID:            id,
+		AutoReplay:    replay,
+		subscribers:   make([]*Subscriber, 0),
+		isAutoStream:  isAutoStream,
+		register:      make(chan *Subscriber),
+		deregister:    make(chan *Subscriber),
+		event:         make(chan *Event, buffSize),
+		quit:          make(chan struct{}),
+		Eventlog:      make(EventLog, 0),
+		OnSubscribe:   onSubscribe,
+		OnUnsubscribe: onUnsubscribe,
 	}
 }
 
@@ -50,6 +61,10 @@ func (str *Stream) run() {
 				i := str.getSubIndex(subscriber)
 				if i != -1 {
 					str.removeSubscriber(i)
+				}
+
+				if str.OnUnsubscribe != nil {
+					go str.OnUnsubscribe(str.ID, subscriber)
 				}
 
 			// Publish event to subscribers
@@ -85,12 +100,13 @@ func (str *Stream) getSubIndex(sub *Subscriber) int {
 }
 
 // addSubscriber will create a new subscriber on a stream
-func (str *Stream) addSubscriber(eventid int) *Subscriber {
+func (str *Stream) addSubscriber(eventid int, url *url.URL) *Subscriber {
 	atomic.AddInt32(&str.subscriberCount, 1)
 	sub := &Subscriber{
 		eventid:    eventid,
 		quit:       str.deregister,
 		connection: make(chan *Event, 64),
+		URL:        url,
 	}
 
 	if str.isAutoStream {
@@ -98,6 +114,11 @@ func (str *Stream) addSubscriber(eventid int) *Subscriber {
 	}
 
 	str.register <- sub
+
+	if str.OnSubscribe != nil {
+		go str.OnSubscribe(str.ID, sub)
+	}
+
 	return sub
 }
 

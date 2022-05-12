@@ -45,6 +45,16 @@ func TestServerCreateStream(t *testing.T) {
 	assert.NotNil(t, s.getStream("test"))
 }
 
+func TestServerWithCallback(t *testing.T) {
+	funcA := func(string, *Subscriber) {}
+	funcB := func(string, *Subscriber) {}
+
+	s := NewWithCallback(funcA, funcB)
+	defer s.Close()
+	assert.NotNil(t, s.OnSubscribe)
+	assert.NotNil(t, s.OnUnsubscribe)
+}
+
 func TestServerCreateExistingStream(t *testing.T) {
 	s := New()
 	defer s.Close()
@@ -84,7 +94,7 @@ func TestServerExistingStreamPublish(t *testing.T) {
 
 	s.CreateStream("test")
 	stream := s.getStream("test")
-	sub := stream.addSubscriber(0)
+	sub := stream.addSubscriber(0, nil)
 
 	s.Publish("test", &Event{Data: []byte("test")})
 

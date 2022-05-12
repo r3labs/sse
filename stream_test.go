@@ -16,12 +16,12 @@ import (
 // Maybe fix this in the future so we can test with -race enabled
 
 func TestStreamAddSubscriber(t *testing.T) {
-	s := newStream(1024, true, false)
+	s := newStream("test", 1024, true, false, nil, nil)
 	s.run()
 	defer s.close()
 
 	s.event <- &Event{Data: []byte("test")}
-	sub := s.addSubscriber(0)
+	sub := s.addSubscriber(0, nil)
 
 	assert.Equal(t, 1, s.getSubscriberCount())
 
@@ -34,11 +34,11 @@ func TestStreamAddSubscriber(t *testing.T) {
 }
 
 func TestStreamRemoveSubscriber(t *testing.T) {
-	s := newStream(1024, true, false)
+	s := newStream("test", 1024, true, false, nil, nil)
 	s.run()
 	defer s.close()
 
-	s.addSubscriber(0)
+	s.addSubscriber(0, nil)
 	time.Sleep(time.Millisecond * 100)
 	s.removeSubscriber(0)
 
@@ -46,11 +46,11 @@ func TestStreamRemoveSubscriber(t *testing.T) {
 }
 
 func TestStreamSubscriberClose(t *testing.T) {
-	s := newStream(1024, true, false)
+	s := newStream("test", 1024, true, false, nil, nil)
 	s.run()
 	defer s.close()
 
-	sub := s.addSubscriber(0)
+	sub := s.addSubscriber(0, nil)
 	sub.close()
 	time.Sleep(time.Millisecond * 100)
 
@@ -58,14 +58,14 @@ func TestStreamSubscriberClose(t *testing.T) {
 }
 
 func TestStreamDisableAutoReplay(t *testing.T) {
-	s := newStream(1024, true, false)
+	s := newStream("test", 1024, true, false, nil, nil)
 	s.run()
 	defer s.close()
 
 	s.AutoReplay = false
 	s.event <- &Event{Data: []byte("test")}
 	time.Sleep(time.Millisecond * 100)
-	sub := s.addSubscriber(0)
+	sub := s.addSubscriber(0, nil)
 
 	assert.Equal(t, 0, len(sub.connection))
 }
@@ -73,11 +73,11 @@ func TestStreamDisableAutoReplay(t *testing.T) {
 func TestStreamMultipleSubscribers(t *testing.T) {
 	var subs []*Subscriber
 
-	s := newStream(1024, true, false)
+	s := newStream("test", 1024, true, false, nil, nil)
 	s.run()
 
 	for i := 0; i < 10; i++ {
-		subs = append(subs, s.addSubscriber(0))
+		subs = append(subs, s.addSubscriber(0, nil))
 	}
 
 	// Wait for all subscribers to be added

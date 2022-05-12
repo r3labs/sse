@@ -18,7 +18,7 @@ import (
 	"gopkg.in/cenkalti/backoff.v1"
 )
 
-var url string
+var urlPath string
 var srv *Server
 var server *httptest.Server
 
@@ -55,7 +55,7 @@ func newServer() *Server {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/events", srv.ServeHTTP)
 	server = httptest.NewServer(mux)
-	url = server.URL + "/events"
+	urlPath = server.URL + "/events"
 
 	srv.CreateStream("test")
 
@@ -71,7 +71,7 @@ func newServer401() *Server {
 	})
 
 	server = httptest.NewServer(mux)
-	url = server.URL + "/events"
+	urlPath = server.URL + "/events"
 
 	srv.CreateStream("test")
 
@@ -105,7 +105,7 @@ func TestClientSubscribe(t *testing.T) {
 	setup(false)
 	defer cleanup()
 
-	c := NewClient(url)
+	c := NewClient(urlPath)
 
 	events := make(chan *Event)
 	var cErr error
@@ -131,7 +131,7 @@ func TestClientSubscribeMultiline(t *testing.T) {
 	setupMultiline()
 	defer cleanup()
 
-	c := NewClient(url)
+	c := NewClient(urlPath)
 
 	events := make(chan *Event)
 	var cErr error
@@ -158,7 +158,7 @@ func TestClientChanSubscribeEmptyMessage(t *testing.T) {
 	setup(true)
 	defer cleanup()
 
-	c := NewClient(url)
+	c := NewClient(urlPath)
 
 	events := make(chan *Event)
 	err := c.SubscribeChan("test", events)
@@ -174,7 +174,7 @@ func TestClientChanSubscribe(t *testing.T) {
 	setup(false)
 	defer cleanup()
 
-	c := NewClient(url)
+	c := NewClient(urlPath)
 
 	events := make(chan *Event)
 	err := c.SubscribeChan("test", events)
@@ -196,7 +196,7 @@ func TestClientOnDisconnect(t *testing.T) {
 	setup(false)
 	defer cleanup()
 
-	c := NewClient(url)
+	c := NewClient(urlPath)
 
 	called := make(chan struct{})
 	c.OnDisconnect(func(client *Client) {
@@ -215,7 +215,7 @@ func TestClientChanReconnect(t *testing.T) {
 	setup(false)
 	defer cleanup()
 
-	c := NewClient(url)
+	c := NewClient(urlPath)
 
 	events := make(chan *Event)
 	err := c.SubscribeChan("test", events)
@@ -241,7 +241,7 @@ func TestClientUnsubscribe(t *testing.T) {
 	setup(false)
 	defer cleanup()
 
-	c := NewClient(url)
+	c := NewClient(urlPath)
 
 	events := make(chan *Event)
 	err := c.SubscribeChan("test", events)
@@ -258,7 +258,7 @@ func TestClientUnsubscribeNonBlock(t *testing.T) {
 	setupCount(false, count)
 	defer cleanup()
 
-	c := NewClient(url)
+	c := NewClient(urlPath)
 
 	events := make(chan *Event)
 	err := c.SubscribeChan("test", events)
@@ -286,7 +286,7 @@ func TestClientUnsubscribe401(t *testing.T) {
 	srv = newServer401()
 	defer cleanup()
 
-	c := NewClient(url)
+	c := NewClient(urlPath)
 
 	// limit retries to 3
 	c.ReconnectStrategy = backoff.WithMaxTries(
@@ -306,7 +306,7 @@ func TestClientLargeData(t *testing.T) {
 	srv = newServer()
 	defer cleanup()
 
-	c := NewClient(url, ClientMaxBufferSize(1<<19))
+	c := NewClient(urlPath, ClientMaxBufferSize(1<<19))
 
 	// limit retries to 3
 	c.ReconnectStrategy = backoff.WithMaxTries(
