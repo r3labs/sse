@@ -103,7 +103,7 @@ func (c *Client) SubscribeWithContext(ctx context.Context, stream string, handle
 				return err
 			case msg := <-eventChan:
 				handler(msg)
-			case <- ctx.Done():
+			case <-ctx.Done():
 				return ctx.Err()
 			}
 		}
@@ -231,8 +231,11 @@ func (c *Client) readLoop(reader *EventStreamReader, outCh chan *Event, erChan c
 			} else {
 				msg.ID = []byte(c.EventID)
 			}
-			// Send downstream
-			outCh <- msg
+
+			// Send downstream if the event has something useful
+			if msg.hasContent() {
+				outCh <- msg
+			}
 		}
 	}
 }
@@ -310,7 +313,6 @@ func (c *Client) processEvent(msg []byte) (event *Event, err error) {
 	}
 
 	// Normalize the crlf to lf to make it easier to split the lines.
-	bytes.Replace(msg, []byte("\n\r"), []byte("\n"), -1)
 	// Split the line by "\n" or "\r", per the spec.
 	for _, line := range bytes.FieldsFunc(msg, func(r rune) bool { return r == '\n' || r == '\r' }) {
 		switch {
