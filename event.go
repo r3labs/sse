@@ -19,6 +19,11 @@ type Event struct {
 	Data      []byte
 	Event     []byte
 	Retry     []byte
+	Comment   []byte
+}
+
+func (e *Event) hasContent() bool {
+	return len(e.ID) > 0 || len(e.Data) > 0 || len(e.Event) > 0 || len(e.Retry) > 0
 }
 
 // EventStreamReader scans an io.Reader looking for EventStream messages.

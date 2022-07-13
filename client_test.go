@@ -334,6 +334,26 @@ func TestClientLargeData(t *testing.T) {
 	require.Equal(t, data, d)
 }
 
+func TestClientComment(t *testing.T) {
+	srv = newServer()
+	defer cleanup()
+
+	c := NewClient(urlPath)
+
+	events := make(chan *Event)
+	err := c.SubscribeChan("test", events)
+	require.Nil(t, err)
+
+	srv.Publish("test", &Event{Comment: []byte("comment")})
+	srv.Publish("test", &Event{Data: []byte("test")})
+
+	ev, err := waitEvent(events, time.Second*1)
+	assert.Nil(t, err)
+	assert.Equal(t, []byte("test"), ev.Data)
+
+	c.Unsubscribe(events)
+}
+
 func TestTrimHeader(t *testing.T) {
 	tests := []struct {
 		input []byte

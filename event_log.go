@@ -14,6 +14,10 @@ type EventLog []*Event
 
 // Add event to eventlog
 func (e *EventLog) Add(ev *Event) {
+	if !ev.hasContent() {
+		return
+	}
+
 	ev.ID = []byte(e.currentindex())
 	ev.timestamp = time.Now()
 	*e = append(*e, ev)

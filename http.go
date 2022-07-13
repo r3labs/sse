@@ -75,7 +75,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Push events to client
 	for ev := range sub.connection {
 		// If the data buffer is an empty string abort.
-		if len(ev.Data) == 0 {
+		if len(ev.Data) == 0 && len(ev.Comment) == 0 {
 			break
 		}
 
@@ -84,27 +84,33 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		fmt.Fprintf(w, "id: %s\n", ev.ID)
+		if len(ev.Data) > 0 {
+			fmt.Fprintf(w, "id: %s\n", ev.ID)
 
-		if s.SplitData {
-			sd := bytes.Split(ev.Data, []byte("\n"))
-			for i := range sd {
-				fmt.Fprintf(w, "data: %s\n", sd[i])
-			}
-		} else {
-			if bytes.HasPrefix(ev.Data, []byte(":")) {
-				fmt.Fprintf(w, "%s\n", ev.Data)
+			if s.SplitData {
+				sd := bytes.Split(ev.Data, []byte("\n"))
+				for i := range sd {
+					fmt.Fprintf(w, "data: %s\n", sd[i])
+				}
 			} else {
-				fmt.Fprintf(w, "data: %s\n", ev.Data)
+				if bytes.HasPrefix(ev.Data, []byte(":")) {
+					fmt.Fprintf(w, "%s\n", ev.Data)
+				} else {
+					fmt.Fprintf(w, "data: %s\n", ev.Data)
+				}
+			}
+
+			if len(ev.Event) > 0 {
+				fmt.Fprintf(w, "event: %s\n", ev.Event)
+			}
+
+			if len(ev.Retry) > 0 {
+				fmt.Fprintf(w, "retry: %s\n", ev.Retry)
 			}
 		}
 
-		if len(ev.Event) > 0 {
-			fmt.Fprintf(w, "event: %s\n", ev.Event)
-		}
-
-		if len(ev.Retry) > 0 {
-			fmt.Fprintf(w, "retry: %s\n", ev.Retry)
+		if len(ev.Comment) > 0 {
+			fmt.Fprintf(w, ": %s\n", ev.Comment)
 		}
 
 		fmt.Fprint(w, "\n")
