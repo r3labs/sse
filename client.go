@@ -42,6 +42,7 @@ type Client struct {
 	Retry             time.Time
 	ReconnectStrategy backoff.BackOff
 	disconnectcb      ConnCallback
+	connectedcb       ConnCallback
 	subscribed        map[chan *Event]chan struct{}
 	Headers           map[string]string
 	ReconnectNotify   backoff.Notify
@@ -52,6 +53,7 @@ type Client struct {
 	maxBufferSize     int
 	mu                sync.Mutex
 	EncodingBase64    bool
+	Connected         bool
 }
 
 // NewClient creates a new client
@@ -105,6 +107,13 @@ func (c *Client) SubscribeWithContext(ctx context.Context, stream string, handle
 				handler(msg)
 			case <-ctx.Done():
 				return ctx.Err()
+			default:
+				if !c.Connected {
+					c.Connected = true
+					if c.connectedcb != nil {
+						c.connectedcb(c)
+					}
+				}
 			}
 		}
 	}
@@ -218,6 +227,7 @@ func (c *Client) readLoop(reader *EventStreamReader, outCh chan *Event, erChan c
 			}
 			// run user specified disconnect function
 			if c.disconnectcb != nil {
+				c.Connected = false
 				c.disconnectcb(c)
 			}
 			erChan <- err
@@ -273,6 +283,11 @@ func (c *Client) Unsubscribe(ch chan *Event) {
 // OnDisconnect specifies the function to run when the connection disconnects
 func (c *Client) OnDisconnect(fn ConnCallback) {
 	c.disconnectcb = fn
+}
+
+// OnConnect specifies the function to run when the connection is successful
+func (c *Client) OnConnect(fn ConnCallback) {
+	c.connectedcb = fn
 }
 
 func (c *Client) request(ctx context.Context, stream string) (*http.Response, error) {
