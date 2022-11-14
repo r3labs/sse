@@ -211,6 +211,25 @@ func TestClientOnDisconnect(t *testing.T) {
 	assert.Equal(t, struct{}{}, <-called)
 }
 
+func TestClient_OnConnect(t *testing.T) {
+	setup(false)
+	defer cleanup()
+
+	c := NewClient(urlPath)
+
+	called := make(chan struct{})
+	c.OnConnect(func(client *Client) {
+		called <- struct{}{}
+	})
+
+	go c.Subscribe("test", func(msg *Event) {})
+
+	time.Sleep(time.Second)
+	assert.Equal(t, struct{}{}, <-called)
+
+	server.CloseClientConnections()
+}
+
 func TestClientChanReconnect(t *testing.T) {
 	setup(false)
 	defer cleanup()

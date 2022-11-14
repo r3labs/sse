@@ -101,19 +101,12 @@ func (c *Client) SubscribeWithContext(ctx context.Context, stream string, handle
 
 		for {
 			select {
-			case err := <-errorChan:
+			case err = <-errorChan:
 				return err
 			case msg := <-eventChan:
 				handler(msg)
 			case <-ctx.Done():
 				return ctx.Err()
-			default:
-				if !c.Connected {
-					c.Connected = true
-					if c.connectedcb != nil {
-						c.connectedcb(c)
-					}
-				}
 			}
 		}
 	}
@@ -172,7 +165,7 @@ func (c *Client) SubscribeChanWithContext(ctx context.Context, stream string, ch
 			select {
 			case <-c.subscribed[ch]:
 				return nil
-			case err := <-errorChan:
+			case err = <-errorChan:
 				return err
 			case msg = <-eventChan:
 			}
@@ -234,8 +227,14 @@ func (c *Client) readLoop(reader *EventStreamReader, outCh chan *Event, erChan c
 			return
 		}
 
+		if !c.Connected && c.connectedcb != nil {
+			c.Connected = true
+			c.connectedcb(c)
+		}
+
 		// If we get an error, ignore it.
-		if msg, err := c.processEvent(event); err == nil {
+		var msg *Event
+		if msg, err = c.processEvent(event); err == nil {
 			if len(msg.ID) > 0 {
 				c.EventID = string(msg.ID)
 			} else {
