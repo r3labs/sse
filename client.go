@@ -42,6 +42,7 @@ type Client struct {
 	Retry             time.Time
 	ReconnectStrategy backoff.BackOff
 	disconnectcb      ConnCallback
+	connectedcb       ConnCallback
 	subscribed        map[chan *Event]chan struct{}
 	Headers           map[string]string
 	ReconnectNotify   backoff.Notify
@@ -52,6 +53,7 @@ type Client struct {
 	maxBufferSize     int
 	mu                sync.Mutex
 	EncodingBase64    bool
+	Connected         bool
 }
 
 // NewClient creates a new client
@@ -99,7 +101,7 @@ func (c *Client) SubscribeWithContext(ctx context.Context, stream string, handle
 
 		for {
 			select {
-			case err := <-errorChan:
+			case err = <-errorChan:
 				return err
 			case msg := <-eventChan:
 				handler(msg)
@@ -161,7 +163,7 @@ func (c *Client) SubscribeChanWithContext(ctx context.Context, stream string, ch
 			select {
 			case <-c.subscribed[ch]:
 				return nil
-			case err := <-errorChan:
+			case err = <-errorChan:
 				return err
 			case msg = <-eventChan:
 			}
@@ -216,14 +218,21 @@ func (c *Client) readLoop(reader *EventStreamReader, outCh chan *Event, erChan c
 			}
 			// run user specified disconnect function
 			if c.disconnectcb != nil {
+				c.Connected = false
 				c.disconnectcb(c)
 			}
 			erChan <- err
 			return
 		}
 
+		if !c.Connected && c.connectedcb != nil {
+			c.Connected = true
+			c.connectedcb(c)
+		}
+
 		// If we get an error, ignore it.
-		if msg, err := c.processEvent(event); err == nil {
+		var msg *Event
+		if msg, err = c.processEvent(event); err == nil {
 			if len(msg.ID) > 0 {
 				c.EventID = string(msg.ID)
 			} else {
@@ -271,6 +280,11 @@ func (c *Client) Unsubscribe(ch chan *Event) {
 // OnDisconnect specifies the function to run when the connection disconnects
 func (c *Client) OnDisconnect(fn ConnCallback) {
 	c.disconnectcb = fn
+}
+
+// OnConnect specifies the function to run when the connection is successful
+func (c *Client) OnConnect(fn ConnCallback) {
+	c.connectedcb = fn
 }
 
 func (c *Client) request(ctx context.Context, stream string) (*http.Response, error) {
