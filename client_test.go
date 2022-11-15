@@ -213,7 +213,7 @@ func TestClientOnDisconnect(t *testing.T) {
 	assert.Equal(t, struct{}{}, <-called)
 }
 
-func TestClient_OnConnect(t *testing.T) {
+func TestClientOnConnect(t *testing.T) {
 	setup(false)
 	defer cleanup()
 
