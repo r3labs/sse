@@ -22,3 +22,8 @@ func (s *Subscriber) close() {
 		<-s.removed
 	}
 }
+
+// Send individual message
+func (s *Subscriber) Send(event *Event) {
+	s.connection <- event
+}
