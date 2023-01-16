@@ -13,6 +13,7 @@ import (
 	"io"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"gopkg.in/cenkalti/backoff.v1"
@@ -49,7 +50,7 @@ type Client struct {
 	ResponseValidator ResponseValidator
 	Connection        *http.Client
 	URL               string
-	EventID           string
+	LastEventID       atomic.Value // []byte
 	maxBufferSize     int
 	mu                sync.Mutex
 	EncodingBase64    bool
@@ -234,9 +235,9 @@ func (c *Client) readLoop(reader *EventStreamReader, outCh chan *Event, erChan c
 		var msg *Event
 		if msg, err = c.processEvent(event); err == nil {
 			if len(msg.ID) > 0 {
-				c.EventID = string(msg.ID)
+				c.LastEventID.Store(msg.ID)
 			} else {
-				msg.ID = []byte(c.EventID)
+				msg.ID, _ = c.LastEventID.Load().([]byte)
 			}
 
 			// Send downstream if the event has something useful
@@ -305,8 +306,9 @@ func (c *Client) request(ctx context.Context, stream string) (*http.Response, er
 	req.Header.Set("Accept", "text/event-stream")
 	req.Header.Set("Connection", "keep-alive")
 
-	if c.EventID != "" {
-		req.Header.Set("Last-Event-ID", c.EventID)
+	lastID, exists := c.LastEventID.Load().([]byte)
+	if exists && lastID != nil {
+		req.Header.Set("Last-Event-ID", string(lastID))
 	}
 
 	// Add user specified headers

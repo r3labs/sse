@@ -38,9 +38,10 @@ func TestStreamRemoveSubscriber(t *testing.T) {
 	s.run()
 	defer s.close()
 
-	s.addSubscriber(0, nil)
+	sub := s.addSubscriber(0, nil)
 	time.Sleep(time.Millisecond * 100)
-	s.removeSubscriber(0)
+	s.deregister <- sub
+	time.Sleep(time.Millisecond * 100)
 
 	assert.Equal(t, 0, s.getSubscriberCount())
 }
