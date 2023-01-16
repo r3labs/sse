@@ -15,13 +15,12 @@ const DefaultBufferSize = 1024
 
 // Server Is our main struct
 type Server struct {
-	Streams map[string]*Stream
+	// Extra headers adding to the HTTP response to each clinet
 	Headers map[string]string
 	// Sets a ttl that prevents old events from being transmitted
 	EventTTL time.Duration
 	// Specifies the size of the message buffer for each stream
 	BufferSize int
-	mu         sync.Mutex
 	// Encodes all data as base64
 	EncodeBase64 bool
 	// Splits an events data into multiple data: entries
@@ -34,6 +33,9 @@ type Server struct {
 	// Specifies the function to run when client subscribe or un-subscribe
 	OnSubscribe   func(streamID string, sub *Subscriber)
 	OnUnsubscribe func(streamID string, sub *Subscriber)
+
+	streams   map[string]*Stream
+	muStreams sync.RWMutex
 }
 
 // New will create a server and setup defaults
@@ -42,7 +44,7 @@ func New() *Server {
 		BufferSize: DefaultBufferSize,
 		AutoStream: false,
 		AutoReplay: true,
-		Streams:    make(map[string]*Stream),
+		streams:    make(map[string]*Stream),
 		Headers:    map[string]string{},
 	}
 }
@@ -53,7 +55,7 @@ func NewWithCallback(onSubscribe, onUnsubscribe func(streamID string, sub *Subsc
 		BufferSize:    DefaultBufferSize,
 		AutoStream:    false,
 		AutoReplay:    true,
-		Streams:       make(map[string]*Stream),
+		streams:       make(map[string]*Stream),
 		Headers:       map[string]string{},
 		OnSubscribe:   onSubscribe,
 		OnUnsubscribe: onUnsubscribe,
@@ -62,64 +64,72 @@ func NewWithCallback(onSubscribe, onUnsubscribe func(streamID string, sub *Subsc
 
 // Close shuts down the server, closes all of the streams and connections
 func (s *Server) Close() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.muStreams.Lock()
+	defer s.muStreams.Unlock()
 
-	for id := range s.Streams {
-		s.Streams[id].quit <- struct{}{}
-		delete(s.Streams, id)
+	for id := range s.streams {
+		s.streams[id].close()
+		delete(s.streams, id)
 	}
 }
 
 // CreateStream will create a new stream and register it
 func (s *Server) CreateStream(id string) *Stream {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.muStreams.Lock()
+	defer s.muStreams.Unlock()
 
-	if s.Streams[id] != nil {
-		return s.Streams[id]
+	if s.streams[id] != nil {
+		return s.streams[id]
 	}
 
 	str := newStream(id, s.BufferSize, s.AutoReplay, s.AutoStream, s.OnSubscribe, s.OnUnsubscribe)
 	str.run()
 
-	s.Streams[id] = str
+	s.streams[id] = str
 
 	return str
 }
 
 // RemoveStream will remove a stream
 func (s *Server) RemoveStream(id string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.muStreams.Lock()
+	defer s.muStreams.Unlock()
 
-	if s.Streams[id] != nil {
-		s.Streams[id].close()
-		delete(s.Streams, id)
+	if s.streams[id] != nil {
+		s.streams[id].close()
+		delete(s.streams, id)
 	}
 }
 
 // StreamExists checks whether a stream by a given id exists
 func (s *Server) StreamExists(id string) bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	return s.Streams[id] != nil
+	return s.getStream(id) != nil
 }
 
-// Publish sends a mesage to every client in a streamID
+// Publish sends a mesage to every client in a streamID.
+// If the stream's buffer is full, it blocks until the message is sent out to
+// all subscribers (but not necessarily arrived the clients), or when the
+// stream is closed.
 func (s *Server) Publish(id string, event *Event) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.Streams[id] != nil {
-		s.Streams[id].event <- s.process(event)
+	send := func() {}
+	s.muStreams.RLock()
+	if s.streams[id] != nil {
+		stream := s.streams[id]
+		send = func() {
+			select {
+			case <-stream.quit:
+			case stream.event <- s.process(event):
+			}
+		}
 	}
+	s.muStreams.RUnlock()
+	send()
 }
 
 func (s *Server) getStream(id string) *Stream {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.Streams[id]
+	s.muStreams.RLock()
+	defer s.muStreams.RUnlock()
+	return s.streams[id]
 }
 
 func (s *Server) process(event *Event) *Event {
