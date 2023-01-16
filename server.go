@@ -122,6 +122,24 @@ func (s *Server) Publish(id string, event *Event) {
 	}
 }
 
+// TryPublish is the same as Publish except that when the operation would cause
+// the call to be blocked, it simply drops the message and returns false.
+// Together with a small BufferSize, it can be useful when publishing the
+// latest message ASAP is more important than reliable delivery.
+func (s *Server) TryPublish(id string, event *Event) bool {
+	stream := s.getStream(id)
+	if stream == nil {
+		return false
+	}
+
+	select {
+	case stream.event <- s.process(event):
+		return true
+	default:
+		return false
+	}
+}
+
 func (s *Server) getStream(id string) *Stream {
 	s.muStreams.RLock()
 	defer s.muStreams.RUnlock()
