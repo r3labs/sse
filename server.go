@@ -15,7 +15,7 @@ const DefaultBufferSize = 1024
 
 // Server Is our main struct
 type Server struct {
-	// Extra headers adding to the HTTP response to each clinet
+	// Extra headers adding to the HTTP response to each client
 	Headers map[string]string
 	// Sets a ttl that prevents old events from being transmitted
 	EventTTL time.Duration
@@ -111,19 +111,15 @@ func (s *Server) StreamExists(id string) bool {
 // all subscribers (but not necessarily arrived the clients), or when the
 // stream is closed.
 func (s *Server) Publish(id string, event *Event) {
-	send := func() {}
-	s.muStreams.RLock()
-	if s.streams[id] != nil {
-		stream := s.streams[id]
-		send = func() {
-			select {
-			case <-stream.quit:
-			case stream.event <- s.process(event):
-			}
-		}
+	stream := s.getStream(id)
+	if stream == nil {
+		return
 	}
-	s.muStreams.RUnlock()
-	send()
+
+	select {
+	case <-stream.quit:
+	case stream.event <- s.process(event):
+	}
 }
 
 func (s *Server) getStream(id string) *Stream {
