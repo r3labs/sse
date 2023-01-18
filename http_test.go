@@ -102,7 +102,7 @@ func TestHTTPStreamHandlerEventID(t *testing.T) {
 	time.Sleep(time.Millisecond * 100)
 
 	c := NewClient(server.URL + "/events")
-	c.EventID = "2"
+	c.LastEventID.Store([]byte("2"))
 
 	events := make(chan *Event)
 	var cErr error
