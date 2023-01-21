@@ -55,6 +55,7 @@ type Client struct {
 	mu                sync.Mutex
 	EncodingBase64    bool
 	Connected         bool
+	AutoReconnect     bool
 }
 
 // NewClient creates a new client
@@ -62,6 +63,7 @@ func NewClient(url string, opts ...func(c *Client)) *Client {
 	c := &Client{
 		URL:           url,
 		Connection:    &http.Client{},
+		AutoReconnect: false,
 		Headers:       make(map[string]string),
 		subscribed:    make(map[chan *Event]chan struct{}),
 		maxBufferSize: 1 << 16,
@@ -214,8 +216,10 @@ func (c *Client) readLoop(reader *EventStreamReader, outCh chan *Event, erChan c
 		event, err := reader.ReadEvent()
 		if err != nil {
 			if err == io.EOF {
-				erChan <- nil
-				return
+				if !c.AutoReconnect {
+					erChan <- nil
+					return
+				}
 			}
 			// run user specified disconnect function
 			if c.disconnectcb != nil {
