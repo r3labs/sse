@@ -109,15 +109,7 @@ func (c *Client) SubscribeWithContext(ctx context.Context, stream string, handle
 			}
 		}
 	}
-
-	// Apply user specified reconnection strategy or default to standard NewExponentialBackOff() reconnection method
-	var err error
-	if c.ReconnectStrategy != nil {
-		err = backoff.RetryNotify(operation, c.ReconnectStrategy, c.ReconnectNotify)
-	} else {
-		err = backoff.RetryNotify(operation, backoff.NewExponentialBackOff(), c.ReconnectNotify)
-	}
-	return err
+	return c.retryNotify(ctx, operation)
 }
 
 // SubscribeChan sends all events to the provided channel
@@ -183,14 +175,7 @@ func (c *Client) SubscribeChanWithContext(ctx context.Context, stream string, ch
 
 	go func() {
 		defer c.cleanup(ch)
-		// Apply user specified reconnection strategy or default to standard NewExponentialBackOff() reconnection method
-		var err error
-		if c.ReconnectStrategy != nil {
-			err = backoff.RetryNotify(operation, c.ReconnectStrategy, c.ReconnectNotify)
-		} else {
-			err = backoff.RetryNotify(operation, backoff.NewExponentialBackOff(), c.ReconnectNotify)
-		}
-
+		err := c.retryNotify(ctx, operation)
 		// channel closed once connected
 		if err != nil && !connected {
 			errch <- err
@@ -199,6 +184,18 @@ func (c *Client) SubscribeChanWithContext(ctx context.Context, stream string, ch
 	err := <-errch
 	close(errch)
 	return err
+}
+
+func (c *Client) retryNotify(ctx context.Context, operation func() error) error {
+	var bk backoff.BackOff
+	// Apply user specified reconnection strategy or default to standard NewExponentialBackOff() reconnection method
+	if c.ReconnectStrategy != nil {
+		bk = c.ReconnectStrategy
+	} else {
+		bk = backoff.NewExponentialBackOff()
+	}
+	bk = backoff.WithContext(bk, ctx)
+	return backoff.RetryNotify(operation, bk, c.ReconnectNotify)
 }
 
 func (c *Client) startReadLoop(reader *EventStreamReader) (chan *Event, chan error) {

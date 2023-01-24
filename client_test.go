@@ -422,3 +422,29 @@ func TestSubscribeWithContextDone(t *testing.T) {
 
 	assert.Equal(t, n1, n2)
 }
+
+func TestSubscribeWithContextAbortRetrier(t *testing.T) {
+	// Run a server that only responds with HTTP errors which will put the client into the
+	// backoff.RetryNotify loop.
+	const status = http.StatusBadGateway
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Log(r.Method, r.URL.String(), http.StatusText(status))
+		w.WriteHeader(status)
+	}))
+	defer srv.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	c := NewClient(srv.URL)
+	c.ReconnectNotify = backoff.Notify(func(err error, d time.Duration) {
+		t.Logf("ReconnectNotify err: %v, duration: %s", err, d.String())
+		// The client has processed the HTTP server error from above, so cancel the context
+		// for the SubscribeWithContext call.
+		cancel()
+	})
+
+	err := c.SubscribeWithContext(ctx, "test", func(msg *Event) {
+		t.Fatal("Received event when none was expected:", msg)
+	})
+	require.Error(t, err)
+	assert.Regexp(t, `could not connect to stream: `+http.StatusText(status), err.Error())
+}
