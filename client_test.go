@@ -8,6 +8,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"runtime"
@@ -33,11 +34,12 @@ var mldata = `{
 	]
 }`
 
-func setup(empty bool) {
+func setup(empty bool) *Server {
 	// New Server
 	srv = newServer()
 	// Send almost-continuous string of events to the client
 	go publishMsgs(srv, empty, 100000000)
+	return srv
 }
 
 func setupMultiline() {
@@ -255,6 +257,42 @@ func TestClientChanReconnect(t *testing.T) {
 		assert.Nil(t, merr)
 		assert.Equal(t, []byte(`ping`), msg)
 	}
+	c.Unsubscribe(events)
+}
+
+func TestClientChanReconnectOnEOF(t *testing.T) {
+	srv := setup(false)
+	defer cleanup()
+	streamID := "test"
+
+	c := NewClient(urlPath)
+
+	var (
+		reconnectErr      error
+		reconnectDuration time.Duration
+	)
+	c.ReconnectStrategy = backoff.NewConstantBackOff(time.Millisecond * 10)
+	c.ReconnectNotify = func(err error, duration time.Duration) {
+		reconnectErr = err
+		reconnectDuration = duration
+	}
+
+	events := make(chan *Event)
+	err := c.SubscribeChan(streamID, events)
+	require.Nil(t, err)
+
+	msg, err := wait(events, time.Millisecond*100)
+	assert.NoError(t, err)
+	assert.Equal(t, []byte(`ping`), msg)
+
+	srv.RemoveStream(streamID)
+	srv.CreateStream(streamID)
+	msg, err = wait(events, time.Millisecond*100)
+	assert.NoError(t, err)
+	assert.Equal(t, io.EOF, reconnectErr)
+	assert.Equal(t, time.Millisecond*10, reconnectDuration)
+	assert.Equal(t, []byte(`ping`), msg)
+
 	c.Unsubscribe(events)
 }
 
