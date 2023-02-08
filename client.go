@@ -209,6 +209,11 @@ func (c *Client) startReadLoop(reader *EventStreamReader) (chan *Event, chan err
 }
 
 func (c *Client) readLoop(reader *EventStreamReader, outCh chan *Event, erChan chan error) {
+	if !c.Connected && c.connectedcb != nil {
+		c.Connected = true
+		c.connectedcb(c)
+	}
+
 	for {
 		// Read each new line and process the type of event
 		event, err := reader.ReadEvent()
@@ -224,11 +229,6 @@ func (c *Client) readLoop(reader *EventStreamReader, outCh chan *Event, erChan c
 			}
 			erChan <- err
 			return
-		}
-
-		if !c.Connected && c.connectedcb != nil {
-			c.Connected = true
-			c.connectedcb(c)
 		}
 
 		// If we get an error, ignore it.

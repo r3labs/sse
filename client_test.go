@@ -214,7 +214,7 @@ func TestClientOnDisconnect(t *testing.T) {
 }
 
 func TestClientOnConnect(t *testing.T) {
-	setup(false)
+	newServer()
 	defer cleanup()
 
 	c := NewClient(urlPath)
@@ -226,10 +226,8 @@ func TestClientOnConnect(t *testing.T) {
 
 	go c.Subscribe("test", func(msg *Event) {})
 
-	time.Sleep(time.Second)
+	time.Sleep(time.Millisecond * 50)
 	assert.Equal(t, struct{}{}, <-called)
-
-	server.CloseClientConnections()
 }
 
 func TestClientChanReconnect(t *testing.T) {
