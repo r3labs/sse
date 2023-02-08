@@ -34,12 +34,11 @@ var mldata = `{
 	]
 }`
 
-func setup(empty bool) *Server {
+func setup(empty bool) {
 	// New Server
 	srv = newServer()
 	// Send almost-continuous string of events to the client
 	go publishMsgs(srv, empty, 100000000)
-	return srv
 }
 
 func setupMultiline() {
@@ -261,7 +260,7 @@ func TestClientChanReconnect(t *testing.T) {
 }
 
 func TestClientChanReconnectOnEOF(t *testing.T) {
-	srv := setup(false)
+	setup(false)
 	defer cleanup()
 	streamID := "test"
 
