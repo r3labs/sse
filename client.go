@@ -42,15 +42,15 @@ type ResponseValidator func(c *Client, resp *http.Response) error
 type Client struct {
 	Retry             time.Time
 	ReconnectStrategy backoff.BackOff
-	disconnectcb      ConnCallback
-	connectedcb       ConnCallback
+	LastEventID       atomic.Value // []byte
+	ReconnectNotify   backoff.Notify
 	subscribed        map[chan *Event]chan struct{}
 	Headers           map[string]string
-	ReconnectNotify   backoff.Notify
+	connectedcb       ConnCallback
 	ResponseValidator ResponseValidator
 	Connection        *http.Client
+	disconnectcb      ConnCallback
 	URL               string
-	LastEventID       atomic.Value // []byte
 	maxBufferSize     int
 	mu                sync.Mutex
 	EncodingBase64    bool

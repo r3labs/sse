@@ -17,10 +17,15 @@ const DefaultBufferSize = 1024
 type Server struct {
 	// Extra headers adding to the HTTP response to each client
 	Headers map[string]string
+	// Specifies the function to run when client subscribe or un-subscribe
+	OnSubscribe   func(streamID string, sub *Subscriber)
+	OnUnsubscribe func(streamID string, sub *Subscriber)
+	streams       map[string]*Stream
 	// Sets a ttl that prevents old events from being transmitted
 	EventTTL time.Duration
 	// Specifies the size of the message buffer for each stream
 	BufferSize int
+	muStreams  sync.RWMutex
 	// Encodes all data as base64
 	EncodeBase64 bool
 	// Splits an events data into multiple data: entries
@@ -29,13 +34,6 @@ type Server struct {
 	AutoStream bool
 	// Enables automatic replay for each new subscriber that connects
 	AutoReplay bool
-
-	// Specifies the function to run when client subscribe or un-subscribe
-	OnSubscribe   func(streamID string, sub *Subscriber)
-	OnUnsubscribe func(streamID string, sub *Subscriber)
-
-	streams   map[string]*Stream
-	muStreams sync.RWMutex
 }
 
 // New will create a server and setup defaults
