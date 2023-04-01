@@ -17,10 +17,15 @@ const DefaultBufferSize = 1024
 type Server struct {
 	// Extra headers adding to the HTTP response to each client
 	Headers map[string]string
+	// Specifies the function to run when client subscribe or un-subscribe
+	OnSubscribe   func(streamID string, sub *Subscriber)
+	OnUnsubscribe func(streamID string, sub *Subscriber)
+	streams       map[string]*Stream
 	// Sets a ttl that prevents old events from being transmitted
 	EventTTL time.Duration
 	// Specifies the size of the message buffer for each stream
 	BufferSize int
+	muStreams  sync.RWMutex
 	// Encodes all data as base64
 	EncodeBase64 bool
 	// Splits an events data into multiple data: entries
@@ -29,13 +34,6 @@ type Server struct {
 	AutoStream bool
 	// Enables automatic replay for each new subscriber that connects
 	AutoReplay bool
-
-	// Specifies the function to run when client subscribe or un-subscribe
-	OnSubscribe   func(streamID string, sub *Subscriber)
-	OnUnsubscribe func(streamID string, sub *Subscriber)
-
-	streams   map[string]*Stream
-	muStreams sync.RWMutex
 }
 
 // New will create a server and setup defaults
@@ -62,7 +60,7 @@ func NewWithCallback(onSubscribe, onUnsubscribe func(streamID string, sub *Subsc
 	}
 }
 
-// Close shuts down the server, closes all of the streams and connections
+// Close shuts down the server, closes all the streams and connections
 func (s *Server) Close() {
 	s.muStreams.Lock()
 	defer s.muStreams.Unlock()
@@ -106,7 +104,7 @@ func (s *Server) StreamExists(id string) bool {
 	return s.getStream(id) != nil
 }
 
-// Publish sends a mesage to every client in a streamID.
+// Publish sends a message to every client in a streamID.
 // If the stream's buffer is full, it blocks until the message is sent out to
 // all subscribers (but not necessarily arrived the clients), or when the
 // stream is closed.

@@ -42,15 +42,15 @@ type ResponseValidator func(c *Client, resp *http.Response) error
 type Client struct {
 	Retry             time.Time
 	ReconnectStrategy backoff.BackOff
-	disconnectcb      ConnCallback
-	connectedcb       ConnCallback
+	LastEventID       atomic.Value // []byte
+	ReconnectNotify   backoff.Notify
 	subscribed        map[chan *Event]chan struct{}
 	Headers           map[string]string
-	ReconnectNotify   backoff.Notify
+	connectedcb       ConnCallback
 	ResponseValidator ResponseValidator
 	Connection        *http.Client
+	disconnectcb      ConnCallback
 	URL               string
-	LastEventID       atomic.Value // []byte
 	maxBufferSize     int
 	mu                sync.Mutex
 	EncodingBase64    bool
@@ -91,7 +91,7 @@ func (c *Client) SubscribeWithContext(ctx context.Context, stream string, handle
 			if err != nil {
 				return err
 			}
-		} else if resp.StatusCode != 200 {
+		} else if resp.StatusCode != http.StatusOK {
 			resp.Body.Close()
 			return fmt.Errorf("could not connect to stream: %s", http.StatusText(resp.StatusCode))
 		}
@@ -143,7 +143,7 @@ func (c *Client) SubscribeChanWithContext(ctx context.Context, stream string, ch
 			if err != nil {
 				return err
 			}
-		} else if resp.StatusCode != 200 {
+		} else if resp.StatusCode != http.StatusOK {
 			resp.Body.Close()
 			return fmt.Errorf("could not connect to stream: %s", http.StatusText(resp.StatusCode))
 		}
@@ -213,7 +213,7 @@ func (c *Client) readLoop(reader *EventStreamReader, outCh chan *Event, erChan c
 		// Read each new line and process the type of event
 		event, err := reader.ReadEvent()
 		if err != nil {
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				erChan <- nil
 				return
 			}
@@ -248,12 +248,12 @@ func (c *Client) readLoop(reader *EventStreamReader, outCh chan *Event, erChan c
 	}
 }
 
-// SubscribeRaw to an sse endpoint
+// SubscribeRaw to a sse endpoint
 func (c *Client) SubscribeRaw(handler func(msg *Event)) error {
 	return c.Subscribe("", handler)
 }
 
-// SubscribeRawWithContext to an sse endpoint with context
+// SubscribeRawWithContext to a sse endpoint with context
 func (c *Client) SubscribeRawWithContext(ctx context.Context, handler func(msg *Event)) error {
 	return c.SubscribeWithContext(ctx, "", handler)
 }
@@ -289,7 +289,7 @@ func (c *Client) OnConnect(fn ConnCallback) {
 }
 
 func (c *Client) request(ctx context.Context, stream string) (*http.Response, error) {
-	req, err := http.NewRequest("GET", c.URL, nil)
+	req, err := http.NewRequest(http.MethodGet, c.URL, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -334,7 +334,7 @@ func (c *Client) processEvent(msg []byte) (event *Event, err error) {
 			e.ID = append([]byte(nil), trimHeader(len(headerID), line)...)
 		case bytes.HasPrefix(line, headerData):
 			// The spec allows for multiple data fields per event, concatenated them with "\n".
-			e.Data = append(e.Data[:], append(trimHeader(len(headerData), line), byte('\n'))...)
+			e.Data = append(e.Data, append(trimHeader(len(headerData), line), byte('\n'))...)
 		// The spec says that a line that simply contains the string "data" should be treated as a data field with an empty body.
 		case bytes.Equal(line, bytes.TrimSuffix(headerData, []byte(":"))):
 			e.Data = append(e.Data, byte('\n'))
@@ -355,7 +355,7 @@ func (c *Client) processEvent(msg []byte) (event *Event, err error) {
 
 		n, err := base64.StdEncoding.Decode(buf, e.Data)
 		if err != nil {
-			err = fmt.Errorf("failed to decode event message: %s", err)
+			err = fmt.Errorf("failed to decode event message: %w", err)
 		}
 		e.Data = buf[:n]
 	}

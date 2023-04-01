@@ -12,22 +12,22 @@ import (
 
 // Stream ...
 type Stream struct {
+	// Specifies the function to run when client subscribe
+	OnSubscribe func(streamID string, sub *Subscriber)
+	event       chan *Event
+	quit        chan struct{}
+	register    chan *Subscriber
+	deregister  chan *Subscriber
+	// Specifies the function to run when client unsubscribe
+	OnUnsubscribe   func(streamID string, sub *Subscriber)
 	ID              string
-	event           chan *Event
-	quit            chan struct{}
-	quitOnce        sync.Once
-	register        chan *Subscriber
-	deregister      chan *Subscriber
 	subscribers     []*Subscriber
 	Eventlog        EventLog
+	quitOnce        sync.Once
 	subscriberCount int32
-	// Enables replaying of eventlog to newly added subscribers
-	AutoReplay   bool
-	isAutoStream bool
-
-	// Specifies the function to run when client subscribe or un-subscribe
-	OnSubscribe   func(streamID string, sub *Subscriber)
-	OnUnsubscribe func(streamID string, sub *Subscriber)
+	isAutoStream    bool
+	// Enables replaying of Eventlog to newly added subscribers
+	AutoReplay bool
 }
 
 // newStream returns a new stream
