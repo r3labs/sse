@@ -79,7 +79,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 
-		// if the event has expired, dont send it
+		// if the event has expired, don't send it
 		if s.EventTTL != 0 && time.Now().After(ev.timestamp.Add(s.EventTTL)) {
 			continue
 		}

@@ -24,7 +24,7 @@ $ make test
 
 #### Example Server
 
-There are two parts of the server. It is comprised of the message scheduler and a http handler function.
+There are two parts of the server. It comprises the message scheduler and a http handler function.
 The messaging system is started when running:
 
 ```go
@@ -42,8 +42,8 @@ func main() {
 }
 ```
 
-This creates a new stream inside of the scheduler. Seeing as there are no consumers, publishing a message to this channel will do nothing.
-Clients can connect to this stream once the http handler is started by specifying _stream_ as a url parameter, like so:
+This creates a new stream inside the scheduler. Seeing as there are no consumers, publishing a message to this channel will do nothing.
+Clients can connect to this stream once the http handler is started by specifying _stream_ as an url parameter, like so:
 
 ```
 http://server/events?stream=messages
@@ -103,7 +103,7 @@ func main() {
 
 #### Example Client
 
-The client exposes a way to connect to an SSE server. The client can also handle multiple events under the same url.
+The client exposes a way to connect to a SSE server. The client can also handle multiple events under the same url.
 
 To create a new client:
 
@@ -141,7 +141,7 @@ func main() {
 
 #### HTTP client parameters
 
-To add additional parameters to the http client, such as disabling ssl verification for self signed certs, you can override the http client or update its options:
+To add additional parameters to the http client, such as disabling ssl verification for self-signed certs, you can override the http client or update its options:
 
 ```go
 func main() {

@@ -8,11 +8,12 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"time"
 )
 
-// Event holds all of the event source fields
+// Event holds all the event source fields
 type Event struct {
 	timestamp time.Time
 	ID        []byte
@@ -46,7 +47,7 @@ func NewEventStreamReader(eventStream io.Reader, maxBufferSize int) *EventStream
 		if i, nlen := containsDoubleNewline(data); i >= 0 {
 			return i + nlen, data[0:i], nil
 		}
-		// If we're at EOF, we have all of the data.
+		// If we're at EOF, we have all the data.
 		if atEOF {
 			return len(data), data, nil
 		}
@@ -105,7 +106,7 @@ func (e *EventStreamReader) ReadEvent() ([]byte, error) {
 		return event, nil
 	}
 	if err := e.scanner.Err(); err != nil {
-		if err == context.Canceled {
+		if errors.Is(err, context.Canceled) {
 			return nil, io.EOF
 		}
 		return nil, err

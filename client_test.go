@@ -16,13 +16,14 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
 	"gopkg.in/cenkalti/backoff.v1"
 )
 
-var urlPath string
-var srv *Server
-var server *httptest.Server
+var (
+	urlPath string
+	srv     *Server
+	server  *httptest.Server
+)
 
 var mldata = `{
 	"key": "value",
@@ -406,7 +407,7 @@ func TestSubscribeWithContextDone(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	var n1 = runtime.NumGoroutine()
+	n1 := runtime.NumGoroutine()
 
 	c := NewClient(urlPath)
 
@@ -418,7 +419,7 @@ func TestSubscribeWithContextDone(t *testing.T) {
 	cancel()
 
 	time.Sleep(1 * time.Second)
-	var n2 = runtime.NumGoroutine()
+	n2 := runtime.NumGoroutine()
 
 	assert.Equal(t, n1, n2)
 }

@@ -21,7 +21,7 @@ type Stream struct {
 	subscribers     []*Subscriber
 	Eventlog        EventLog
 	subscriberCount int32
-	// Enables replaying of eventlog to newly added subscribers
+	// Enables replaying of Eventlog to newly added subscribers
 	AutoReplay   bool
 	isAutoStream bool
 
