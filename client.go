@@ -51,6 +51,8 @@ type Client struct {
 	Connection        *http.Client
 	URL               string
 	LastEventID       atomic.Value // []byte
+	Method            string
+	Body              io.Reader
 	maxBufferSize     int
 	mu                sync.Mutex
 	EncodingBase64    bool
@@ -61,6 +63,8 @@ type Client struct {
 func NewClient(url string, opts ...func(c *Client)) *Client {
 	c := &Client{
 		URL:           url,
+		Method:        "GET",
+		Body:          nil,
 		Connection:    &http.Client{},
 		Headers:       make(map[string]string),
 		subscribed:    make(map[chan *Event]chan struct{}),
@@ -289,14 +293,14 @@ func (c *Client) OnConnect(fn ConnCallback) {
 }
 
 func (c *Client) request(ctx context.Context, stream string) (*http.Response, error) {
-	req, err := http.NewRequest("GET", c.URL, nil)
+	req, err := http.NewRequest(c.Method, c.URL, c.Body)
 	if err != nil {
 		return nil, err
 	}
 	req = req.WithContext(ctx)
 
 	// Setup request, specify stream to connect to
-	if stream != "" {
+	if c.Method == "GET" && stream != "" {
 		query := req.URL.Query()
 		query.Add("stream", stream)
 		req.URL.RawQuery = query.Encode()
