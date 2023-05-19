@@ -9,8 +9,21 @@ import (
 	"time"
 )
 
-// EventLog holds all of previous events
-type EventLog []*Event
+// Events holds all of previous events
+type Events []*Event
+
+// EventLog holds the log of all of previous events
+type EventLog struct {
+	MaxEntries int
+	Log        Events
+}
+
+func newEventLog(maxEntries int) *EventLog {
+	return &EventLog{
+		MaxEntries: maxEntries,
+		Log:        make(Events, 0),
+	}
+}
 
 // Add event to eventlog
 func (e *EventLog) Add(ev *Event) {
@@ -20,24 +33,32 @@ func (e *EventLog) Add(ev *Event) {
 
 	ev.ID = []byte(e.currentindex())
 	ev.timestamp = time.Now()
-	*e = append(*e, ev)
+
+	// if MaxEntries is greater than 0, and we are at max entries limit
+	// then reset the first log item and then pop it
+	if e.MaxEntries > 0 && len(e.Log) == e.MaxEntries {
+		e.Log[0] = nil
+		e.Log = e.Log[1:]
+	}
+
+	e.Log = append(e.Log, ev)
 }
 
 // Clear events from eventlog
 func (e *EventLog) Clear() {
-	*e = nil
+	e.Log = nil
 }
 
 // Replay events to a subscriber
 func (e *EventLog) Replay(s *Subscriber) {
-	for i := 0; i < len(*e); i++ {
-		id, _ := strconv.Atoi(string((*e)[i].ID))
+	for i := 0; i < len(e.Log); i++ {
+		id, _ := strconv.Atoi(string((e.Log)[i].ID))
 		if id >= s.eventid {
-			s.connection <- (*e)[i]
+			s.connection <- (e.Log)[i]
 		}
 	}
 }
 
 func (e *EventLog) currentindex() string {
-	return strconv.Itoa(len(*e))
+	return strconv.Itoa(len(e.Log))
 }

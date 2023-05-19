@@ -19,7 +19,7 @@ type Stream struct {
 	register        chan *Subscriber
 	deregister      chan *Subscriber
 	subscribers     []*Subscriber
-	Eventlog        EventLog
+	Eventlog        *EventLog
 	subscriberCount int32
 	// Enables replaying of eventlog to newly added subscribers
 	AutoReplay   bool
@@ -30,8 +30,21 @@ type Stream struct {
 	OnUnsubscribe func(streamID string, sub *Subscriber)
 }
 
+type StreamOpts struct {
+	// Max amount of log entries per stream
+	MaxEntries int
+	// Enables creation of a stream when a client connects
+	AutoStream bool
+	// Enables automatic replay for each new subscriber that connects
+	AutoReplay bool
+
+	// Specifies the function to run when client subscribe or un-subscribe
+	OnSubscribe   func(streamID string, sub *Subscriber)
+	OnUnsubscribe func(streamID string, sub *Subscriber)
+}
+
 // newStream returns a new stream
-func newStream(id string, buffSize int, replay, isAutoStream bool, onSubscribe, onUnsubscribe func(string, *Subscriber)) *Stream {
+func newStream(id string, buffSize, maxEntries int, replay, isAutoStream bool, onSubscribe, onUnsubscribe func(string, *Subscriber)) *Stream {
 	return &Stream{
 		ID:            id,
 		AutoReplay:    replay,
@@ -41,7 +54,7 @@ func newStream(id string, buffSize int, replay, isAutoStream bool, onSubscribe, 
 		deregister:    make(chan *Subscriber),
 		event:         make(chan *Event, buffSize),
 		quit:          make(chan struct{}),
-		Eventlog:      make(EventLog, 0),
+		Eventlog:      newEventLog(maxEntries),
 		OnSubscribe:   onSubscribe,
 		OnUnsubscribe: onUnsubscribe,
 	}
