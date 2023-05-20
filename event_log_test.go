@@ -17,12 +17,12 @@ func TestEventLog(t *testing.T) {
 	ev.Add(testEvent)
 	ev.Clear()
 
-	assert.Equal(t, 0, len(ev.Log))
+	assert.Equal(t, 0, ev.Len())
 
 	ev.Add(testEvent)
 	ev.Add(testEvent)
 
-	assert.Equal(t, 2, len(ev.Log))
+	assert.Equal(t, 2, ev.Len())
 }
 
 func TestEventLogMaxEntries(t *testing.T) {
@@ -33,5 +33,5 @@ func TestEventLogMaxEntries(t *testing.T) {
 	ev.Add(testEvent)
 	ev.Add(testEvent)
 
-	assert.Equal(t, 2, len(ev.Log))
+	assert.Equal(t, 2, ev.Len())
 }
