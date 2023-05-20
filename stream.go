@@ -37,10 +37,6 @@ type StreamOpts struct {
 	AutoStream bool
 	// Enables automatic replay for each new subscriber that connects
 	AutoReplay bool
-
-	// Specifies the function to run when client subscribe or un-subscribe
-	OnSubscribe   func(streamID string, sub *Subscriber)
-	OnUnsubscribe func(streamID string, sub *Subscriber)
 }
 
 // newStream returns a new stream

@@ -99,7 +99,7 @@ func (s *Server) CreateStreamWithOpts(id string, opts StreamOpts) *Stream {
 		return s.streams[id]
 	}
 
-	str := newStream(id, s.BufferSize, opts.MaxEntries, opts.AutoReplay, opts.AutoStream, opts.OnSubscribe, opts.OnUnsubscribe)
+	str := newStream(id, s.BufferSize, opts.MaxEntries, opts.AutoReplay, opts.AutoStream, s.OnSubscribe, s.OnUnsubscribe)
 	str.run()
 
 	s.streams[id] = str
