@@ -5,39 +5,66 @@
 package sse
 
 import (
+	"container/list"
 	"strconv"
 	"time"
 )
 
-// EventLog holds all of previous events
-type EventLog []*Event
+// Events holds all of previous events
+type Events []*Event
 
-// Add event to eventlog
+// EventLog holds the log of all of previous events
+type EventLog struct {
+	MaxEntries int
+	log        *list.List
+}
+
+func newEventLog(maxEntries int) *EventLog {
+	return &EventLog{
+		MaxEntries: maxEntries,
+		log:        list.New(),
+	}
+}
+
+// Add event to log
 func (e *EventLog) Add(ev *Event) {
 	if !ev.hasContent() {
 		return
 	}
 
-	ev.ID = []byte(e.currentindex())
+	ev.ID = []byte(e.currentIndex())
 	ev.timestamp = time.Now()
-	*e = append(*e, ev)
+
+	// if MaxEntries is set to greater than 0 (no limit) check entries
+	if e.MaxEntries > 0 {
+		// if we are at max entries limit
+		// then remove the item at the back
+		if e.log.Len() >= e.MaxEntries {
+			e.log.Remove(e.log.Back())
+		}
+	}
+	e.log.PushFront(ev)
 }
 
-// Clear events from eventlog
+// Clear events from log
 func (e *EventLog) Clear() {
-	*e = nil
+	e.log.Init()
 }
 
 // Replay events to a subscriber
 func (e *EventLog) Replay(s *Subscriber) {
-	for i := 0; i < len(*e); i++ {
-		id, _ := strconv.Atoi(string((*e)[i].ID))
+	for l := e.log.Back(); l != nil; l = l.Prev() {
+		id, _ := strconv.Atoi(string(l.Value.(*Event).ID))
 		if id >= s.eventid {
-			s.connection <- (*e)[i]
+			s.connection <- l.Value.(*Event)
 		}
 	}
 }
 
-func (e *EventLog) currentindex() string {
-	return strconv.Itoa(len(*e))
+func (e *EventLog) currentIndex() string {
+	return strconv.Itoa(e.log.Len())
+}
+
+func (e *EventLog) Len() int {
+	return e.log.Len()
 }

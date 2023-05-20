@@ -16,7 +16,7 @@ import (
 // Maybe fix this in the future so we can test with -race enabled
 
 func TestStreamAddSubscriber(t *testing.T) {
-	s := newStream("test", 1024, true, false, nil, nil)
+	s := newStream("test", 1024, 0, true, false, nil, nil)
 	s.run()
 	defer s.close()
 
@@ -34,7 +34,7 @@ func TestStreamAddSubscriber(t *testing.T) {
 }
 
 func TestStreamRemoveSubscriber(t *testing.T) {
-	s := newStream("test", 1024, true, false, nil, nil)
+	s := newStream("test", 1024, 0, true, false, nil, nil)
 	s.run()
 	defer s.close()
 
@@ -47,7 +47,7 @@ func TestStreamRemoveSubscriber(t *testing.T) {
 }
 
 func TestStreamSubscriberClose(t *testing.T) {
-	s := newStream("test", 1024, true, false, nil, nil)
+	s := newStream("test", 1024, 0, true, false, nil, nil)
 	s.run()
 	defer s.close()
 
@@ -59,7 +59,7 @@ func TestStreamSubscriberClose(t *testing.T) {
 }
 
 func TestStreamDisableAutoReplay(t *testing.T) {
-	s := newStream("test", 1024, true, false, nil, nil)
+	s := newStream("test", 1024, 0, true, false, nil, nil)
 	s.run()
 	defer s.close()
 
@@ -74,7 +74,7 @@ func TestStreamDisableAutoReplay(t *testing.T) {
 func TestStreamMultipleSubscribers(t *testing.T) {
 	var subs []*Subscriber
 
-	s := newStream("test", 1024, true, false, nil, nil)
+	s := newStream("test", 1024, 0, true, false, nil, nil)
 	s.run()
 
 	for i := 0; i < 10; i++ {

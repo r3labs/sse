@@ -82,7 +82,24 @@ func (s *Server) CreateStream(id string) *Stream {
 		return s.streams[id]
 	}
 
-	str := newStream(id, s.BufferSize, s.AutoReplay, s.AutoStream, s.OnSubscribe, s.OnUnsubscribe)
+	str := newStream(id, s.BufferSize, 0, s.AutoReplay, s.AutoStream, s.OnSubscribe, s.OnUnsubscribe)
+	str.run()
+
+	s.streams[id] = str
+
+	return str
+}
+
+// CreateStreamWithOpts will create a new stream with options and register it
+func (s *Server) CreateStreamWithOpts(id string, opts StreamOpts) *Stream {
+	s.muStreams.Lock()
+	defer s.muStreams.Unlock()
+
+	if s.streams[id] != nil {
+		return s.streams[id]
+	}
+
+	str := newStream(id, s.BufferSize, opts.MaxEntries, opts.AutoReplay, opts.AutoStream, s.OnSubscribe, s.OnUnsubscribe)
 	str.run()
 
 	s.streams[id] = str
