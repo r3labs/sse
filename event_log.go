@@ -34,11 +34,14 @@ func (e *EventLog) Add(ev *Event) {
 	ev.ID = []byte(e.currentindex())
 	ev.timestamp = time.Now()
 
-	// if MaxEntries is greater than 0, and we are at max entries limit
-	// then reset the first log item and then pop it
-	if e.MaxEntries > 0 && len(e.Log) == e.MaxEntries {
-		e.Log[0] = nil
-		e.Log = e.Log[1:]
+	// if MaxEntries is set to greater than 0 (no limit) check entries
+	if e.MaxEntries > 0 {
+		// ifa we are at max entries limit
+		// then reset the first log item and then pop it
+		if len(e.Log) >= e.MaxEntries {
+			e.Log[0] = nil
+			e.Log = e.Log[1:]
+		}
 	}
 
 	e.Log = append(e.Log, ev)
