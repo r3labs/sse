@@ -112,7 +112,7 @@ func TestClientSubscribe(t *testing.T) {
 	events := make(chan *Event)
 	var cErr error
 	go func() {
-		cErr = c.Subscribe("test", func(msg *Event) {
+		_, cErr = c.Subscribe("test", func(msg *Event) {
 			if msg.Data != nil {
 				events <- msg
 				return
@@ -139,7 +139,7 @@ func TestClientSubscribeMultiline(t *testing.T) {
 	var cErr error
 
 	go func() {
-		cErr = c.Subscribe("test", func(msg *Event) {
+		_, cErr = c.Subscribe("test", func(msg *Event) {
 			if msg.Data != nil {
 				events <- msg
 				return
@@ -315,7 +315,7 @@ func TestClientUnsubscribe401(t *testing.T) {
 		3,
 	)
 
-	err := c.SubscribeRaw(func(ev *Event) {
+	_, err := c.SubscribeRaw(func(ev *Event) {
 		// this shouldn't run
 		assert.False(t, true)
 	})

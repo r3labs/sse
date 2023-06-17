@@ -30,7 +30,7 @@ func TestHTTPStreamHandler(t *testing.T) {
 	events := make(chan *Event)
 	var cErr error
 	go func() {
-		cErr = c.Subscribe("test", func(msg *Event) {
+		_, cErr = c.Subscribe("test", func(msg *Event) {
 			if msg.Data != nil {
 				events <- msg
 				return
@@ -69,7 +69,7 @@ func TestHTTPStreamHandlerExistingEvents(t *testing.T) {
 	events := make(chan *Event)
 	var cErr error
 	go func() {
-		cErr = c.Subscribe("test", func(msg *Event) {
+		_, cErr = c.Subscribe("test", func(msg *Event) {
 			if len(msg.Data) > 0 {
 				events <- msg
 			}
@@ -107,7 +107,7 @@ func TestHTTPStreamHandlerEventID(t *testing.T) {
 	events := make(chan *Event)
 	var cErr error
 	go func() {
-		cErr = c.Subscribe("test", func(msg *Event) {
+		_, cErr = c.Subscribe("test", func(msg *Event) {
 			if len(msg.Data) > 0 {
 				events <- msg
 			}
@@ -145,7 +145,7 @@ func TestHTTPStreamHandlerEventTTL(t *testing.T) {
 	events := make(chan *Event)
 	var cErr error
 	go func() {
-		cErr = c.Subscribe("test", func(msg *Event) {
+		_, cErr = c.Subscribe("test", func(msg *Event) {
 			if len(msg.Data) > 0 {
 				events <- msg
 			}

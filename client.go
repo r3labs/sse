@@ -79,25 +79,25 @@ func NewClient(url string, opts ...func(c *Client)) *Client {
 }
 
 // Subscribe to a data stream
-func (c *Client) Subscribe(stream string, handler func(msg *Event)) error {
+func (c *Client) Subscribe(stream string, handler func(msg *Event)) (*http.Response, error) {
 	return c.SubscribeWithContext(context.Background(), stream, handler)
 }
 
 // SubscribeWithContext to a data stream with context
-func (c *Client) SubscribeWithContext(ctx context.Context, stream string, handler func(msg *Event)) error {
-	operation := func() error {
+func (c *Client) SubscribeWithContext(ctx context.Context, stream string, handler func(msg *Event)) (*http.Response, error) {
+	operation := func() (*http.Response, error) {
 		resp, err := c.request(ctx, stream)
 		if err != nil {
-			return err
+			return resp, err
 		}
 		if validator := c.ResponseValidator; validator != nil {
 			err = validator(c, resp)
 			if err != nil {
-				return err
+				return resp, err
 			}
 		} else if resp.StatusCode != 200 {
 			resp.Body.Close()
-			return fmt.Errorf("could not connect to stream: %s", http.StatusText(resp.StatusCode))
+			return resp, fmt.Errorf("could not connect to stream: %s", http.StatusText(resp.StatusCode))
 		}
 		defer resp.Body.Close()
 
@@ -107,21 +107,14 @@ func (c *Client) SubscribeWithContext(ctx context.Context, stream string, handle
 		for {
 			select {
 			case err = <-errorChan:
-				return err
+				return resp, err
 			case msg := <-eventChan:
 				handler(msg)
 			}
 		}
 	}
 
-	// Apply user specified reconnection strategy or default to standard NewExponentialBackOff() reconnection method
-	var err error
-	if c.ReconnectStrategy != nil {
-		err = backoff.RetryNotify(operation, c.ReconnectStrategy, c.ReconnectNotify)
-	} else {
-		err = backoff.RetryNotify(operation, backoff.NewExponentialBackOff(), c.ReconnectNotify)
-	}
-	return err
+	return operation()
 }
 
 // SubscribeChan sends all events to the provided channel
@@ -253,12 +246,12 @@ func (c *Client) readLoop(reader *EventStreamReader, outCh chan *Event, erChan c
 }
 
 // SubscribeRaw to an sse endpoint
-func (c *Client) SubscribeRaw(handler func(msg *Event)) error {
+func (c *Client) SubscribeRaw(handler func(msg *Event)) (*http.Response, error) {
 	return c.Subscribe("", handler)
 }
 
 // SubscribeRawWithContext to an sse endpoint with context
-func (c *Client) SubscribeRawWithContext(ctx context.Context, handler func(msg *Event)) error {
+func (c *Client) SubscribeRawWithContext(ctx context.Context, handler func(msg *Event)) (*http.Response, error) {
 	return c.SubscribeWithContext(ctx, "", handler)
 }
 
