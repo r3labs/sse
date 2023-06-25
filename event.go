@@ -64,14 +64,6 @@ func NewEventStreamReader(eventStream io.Reader, maxBufferSize int, split bufio.
 	}
 }
 
-// NewEventStreamReaderFromScanner creates an instance of EventStreamReader from scanner.
-// can custom scanner's split and buffer size
-func NewEventStreamReaderFromScanner(scanner *bufio.Scanner) *EventStreamReader {
-	return &EventStreamReader{
-		scanner: scanner,
-	}
-}
-
 // Returns a tuple containing the index of a double newline, and the number of bytes
 // represented by that sequence. If no double newline is present, the first value
 // will be negative.
