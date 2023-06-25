@@ -5,6 +5,7 @@
 package sse
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/base64"
@@ -32,6 +33,12 @@ func ClientMaxBufferSize(s int) func(c *Client) {
 	}
 }
 
+func SplitFunc(f bufio.SplitFunc) func(c *Client) {
+	return func(c *Client) {
+		c.split = f
+	}
+}
+
 // ConnCallback defines a function to be called on a particular connection event
 type ConnCallback func(c *Client)
 
@@ -55,6 +62,7 @@ type Client struct {
 	mu                sync.Mutex
 	EncodingBase64    bool
 	Connected         bool
+	split             bufio.SplitFunc
 }
 
 // NewClient creates a new client
@@ -97,7 +105,7 @@ func (c *Client) SubscribeWithContext(ctx context.Context, stream string, handle
 		}
 		defer resp.Body.Close()
 
-		reader := NewEventStreamReader(resp.Body, c.maxBufferSize)
+		reader := NewEventStreamReader(resp.Body, c.maxBufferSize, c.split)
 		eventChan, errorChan := c.startReadLoop(reader)
 
 		for {
@@ -155,7 +163,7 @@ func (c *Client) SubscribeChanWithContext(ctx context.Context, stream string, ch
 			connected = true
 		}
 
-		reader := NewEventStreamReader(resp.Body, c.maxBufferSize)
+		reader := NewEventStreamReader(resp.Body, c.maxBufferSize, c.split)
 		eventChan, errorChan := c.startReadLoop(reader)
 
 		for {
@@ -387,4 +395,3 @@ func trimHeader(size int, data []byte) []byte {
 		data = data[:len(data)-1]
 	}
 	return data
-}
