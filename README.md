@@ -139,6 +139,45 @@ func main() {
 }
 ```
 
+If you want use this lib for openai sse client, you can follow this example:
+
+```go
+apiKey := "sk-***"
+log.SetLevel(log.Debug)
+ctx := context.TODO()
+client := sse.NewClient("https://api.openai.com/v1/chat/completions", func(c *sse.Client) {
+    c.IsDebug = false
+    // make any request, if you set MakeRequest then sse lib will not modify your request
+    c.MakeRequest = func() (*http.Request, error) {
+        buff := []byte(`{
+            "model":"gpt-3.5-turbo",
+            "stream": true,
+            "messages":[
+                {
+                    "role":"system",
+                    "content":"You are a helpful assistant."
+                },
+                {
+                    "role":"user",
+                    "content":"Hello!"
+                }
+            ]
+        }`)
+        req, err := http.NewRequest(http.MethodPost, "https://api.openai.com/v1/chat/completions", bytes.NewBuffer(buff))
+        req.Header["Authorization"] = []string{"Bearer " + apiKey}
+        req.Header["Content-Type"] = []string{"application/json"}
+        return req, err
+    }
+})
+err := client.SubscribeWithContext(ctx, "", func(msg *sse.Event) {
+    log.Infof("receive msg: %+v", msg)
+})
+if err != nil {
+    panic(err)
+}
+
+```
+
 #### HTTP client parameters
 
 To add additional parameters to the http client, such as disabling ssl verification for self signed certs, you can override the http client or update its options:

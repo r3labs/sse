@@ -11,7 +11,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
+	"net/http/httputil"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -38,6 +40,8 @@ type ConnCallback func(c *Client)
 // ResponseValidator validates a response
 type ResponseValidator func(c *Client, resp *http.Response) error
 
+type MakeRequest func() (*http.Request, error)
+
 // Client handles an incoming server stream
 type Client struct {
 	Retry             time.Time
@@ -55,6 +59,8 @@ type Client struct {
 	mu                sync.Mutex
 	EncodingBase64    bool
 	Connected         bool
+	IsDebug           bool
+	MakeRequest       MakeRequest
 }
 
 // NewClient creates a new client
@@ -289,34 +295,49 @@ func (c *Client) OnConnect(fn ConnCallback) {
 }
 
 func (c *Client) request(ctx context.Context, stream string) (*http.Response, error) {
-	req, err := http.NewRequest("GET", c.URL, nil)
+	var (
+		req *http.Request
+		err error
+	)
+	if c.MakeRequest != nil {
+		req, err = c.MakeRequest()
+	} else {
+		req, err = http.NewRequest("GET", c.URL, nil)
+		// Setup request, specify stream to connect to
+		if stream != "" {
+			query := req.URL.Query()
+			query.Add("stream", stream)
+			req.URL.RawQuery = query.Encode()
+		}
+
+		req.Header.Set("Cache-Control", "no-cache")
+		req.Header.Set("Accept", "text/event-stream")
+		req.Header.Set("Connection", "keep-alive")
+
+		lastID, exists := c.LastEventID.Load().([]byte)
+		if exists && lastID != nil {
+			req.Header.Set("Last-Event-ID", string(lastID))
+		}
+
+		// Add user specified headers
+		for k, v := range c.Headers {
+			req.Header.Set(k, v)
+		}
+	}
 	if err != nil {
 		return nil, err
 	}
 	req = req.WithContext(ctx)
-
-	// Setup request, specify stream to connect to
-	if stream != "" {
-		query := req.URL.Query()
-		query.Add("stream", stream)
-		req.URL.RawQuery = query.Encode()
+	if c.IsDebug {
+		reqBuff, _ := httputil.DumpRequest(req, true)
+		log.Printf("%s", string(reqBuff))
 	}
-
-	req.Header.Set("Cache-Control", "no-cache")
-	req.Header.Set("Accept", "text/event-stream")
-	req.Header.Set("Connection", "keep-alive")
-
-	lastID, exists := c.LastEventID.Load().([]byte)
-	if exists && lastID != nil {
-		req.Header.Set("Last-Event-ID", string(lastID))
+	resp, err := c.Connection.Do(req)
+	if c.IsDebug {
+		respBuff, _ := httputil.DumpResponse(resp, true)
+		log.Printf("%s", string(respBuff))
 	}
-
-	// Add user specified headers
-	for k, v := range c.Headers {
-		req.Header.Set(k, v)
-	}
-
-	return c.Connection.Do(req)
+	return resp, err
 }
 
 func (c *Client) processEvent(msg []byte) (event *Event, err error) {
