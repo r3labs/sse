@@ -55,6 +55,8 @@ type Client struct {
 	mu                sync.Mutex
 	EncodingBase64    bool
 	Connected         bool
+	Method            string
+	Body              io.Reader
 }
 
 // NewClient creates a new client
@@ -65,6 +67,8 @@ func NewClient(url string, opts ...func(c *Client)) *Client {
 		Headers:       make(map[string]string),
 		subscribed:    make(map[chan *Event]chan struct{}),
 		maxBufferSize: 1 << 16,
+		Method:        http.MethodGet,
+		Body:          nil,
 	}
 
 	for _, opt := range opts {
@@ -289,7 +293,7 @@ func (c *Client) OnConnect(fn ConnCallback) {
 }
 
 func (c *Client) request(ctx context.Context, stream string) (*http.Response, error) {
-	req, err := http.NewRequest("GET", c.URL, nil)
+	req, err := http.NewRequest(c.Method, c.URL, c.Body)
 	if err != nil {
 		return nil, err
 	}

@@ -167,6 +167,33 @@ func main() {
 }
 ```
 
+#### Use POST method
+
+To set custom query parameters on the client or disable the stream parameter altogether:
+
+```go
+func main() {
+
+	params := map[string]string{
+		"key": "value",
+	}
+	data := url.Values{}
+	for k, v := range params {
+		data.Add(k, v)
+	}
+	client := sse.NewClient("http://server/events?search=example", func(c *sse.Client) {
+		c.Headers["Content-Type"] = "application/x-www-form-urlencoded"
+		c.Method = http.MethodPost
+		c.Body = strings.NewReader(data.Encode())
+	})
+
+	client.SubscribeRaw(func(msg *sse.Event) {
+		// Got some data!
+		fmt.Println(msg.Data)
+	})
+}
+```
+
 
 ## Contributing
 
