@@ -10,6 +10,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"sync"
 	"sync/atomic"
@@ -133,6 +134,8 @@ func (c *Client) SubscribeChanWithContext(ctx context.Context, stream string, ch
 	c.mu.Unlock()
 
 	operation := func() error {
+		log.Default().Printf(":::sse connecting to %s", c.URL)
+
 		resp, err := c.request(ctx, stream)
 		if err != nil {
 			return err
@@ -164,6 +167,7 @@ func (c *Client) SubscribeChanWithContext(ctx context.Context, stream string, ch
 			case <-c.subscribed[ch]:
 				return nil
 			case err = <-errorChan:
+				log.Default().Printf(":::sse receive an error: %s", err.Error())
 				return err
 			case msg = <-eventChan:
 			}
