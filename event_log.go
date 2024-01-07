@@ -6,7 +6,6 @@ package sse
 
 import (
 	"strconv"
-	"time"
 )
 
 // EventLog holds all of previous events
@@ -19,7 +18,6 @@ func (e *EventLog) Add(ev *Event) {
 	}
 
 	ev.ID = []byte(e.currentindex())
-	ev.timestamp = time.Now()
 	*e = append(*e, ev)
 }
 
