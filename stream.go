@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 // Stream ...
@@ -71,6 +72,7 @@ func (str *Stream) run() {
 
 			// Publish event to subscribers
 			case event := <-str.event:
+				event.timestamp = time.Now()
 				if str.AutoReplay {
 					str.Eventlog.Add(event)
 				}

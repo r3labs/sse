@@ -159,6 +159,39 @@ func TestHTTPStreamHandlerEventTTL(t *testing.T) {
 	assert.Equal(t, []byte("test 3"), msg)
 }
 
+func TestHTTPStreamHandlerEventTTLNoReplay(t *testing.T) {
+	s := New()
+	defer s.Close()
+
+	s.EventTTL = time.Second * 1
+	s.AutoReplay = false
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/events", s.ServeHTTP)
+	server := httptest.NewServer(mux)
+
+	s.CreateStream("test")
+
+	c := NewClient(server.URL + "/events")
+	events := make(chan *Event)
+	var cErr error
+	go func() {
+		cErr = c.Subscribe("test", func(msg *Event) {
+			if len(msg.Data) > 0 {
+				events <- msg
+			}
+		})
+	}()
+
+	require.Nil(t, cErr)
+
+	time.Sleep(time.Millisecond * 100)
+	s.Publish("test", &Event{Data: []byte("test 1")})
+	msg, err := wait(events, time.Millisecond*500)
+	require.Nil(t, err)
+	assert.Equal(t, []byte("test 1"), msg)
+}
+
 func TestHTTPStreamHandlerHeaderFlushIfNoEvents(t *testing.T) {
 	s := New()
 	defer s.Close()
