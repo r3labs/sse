@@ -12,12 +12,13 @@ We also have a [code of conduct](https://ernest.io/conduct).
 
 The issue tracker is the preferred channel for [bug reports](#bug-reports), [features requests](#feature-requests) and [submitting pull requests](#pull-requests), but please respect the following restrictions:
 
-* Please **do not** use the issue tracker for personal support requests.
+- Please **do not** use the issue tracker for personal support requests.
 
-* Please **do not** derail issues. Keep the discussion on topic and
+- Please **do not** derail issues. Keep the discussion on topic and
   respect the opinions of others.
-  
+
 <a name="bugs"></a>
+
 ## Bug reports
 
 A bug is a _demonstrable problem_ that is caused by the code in the repository.
@@ -25,13 +26,13 @@ Good bug reports are extremely helpful - thank you!
 
 Guidelines for bug reports:
 
-1. **Use the GitHub issue search** &mdash; check if the issue has already been
+1. **Use the GitHub issue search** — check if the issue has already been
    reported.
 
-2. **Check if the issue has been fixed** &mdash; try to reproduce it using the
+1. **Check if the issue has been fixed** — try to reproduce it using the
    latest `master` or `develop` branch in the repository.
 
-3. **Isolate the problem** &mdash; create a reduced test case and a live example.
+1. **Isolate the problem** — create a reduced test case and a live example.
 
 A good bug report shouldn't leave others needing to chase you up for more
 information. Please try to be as detailed as possible in your report. What is
@@ -46,8 +47,8 @@ Example:
 > suitable, include the steps required to reproduce the bug.
 >
 > 1. This is the first step
-> 2. This is the second step
-> 3. Further steps, etc.
+> 1. This is the second step
+> 1. Further steps, etc.
 >
 > `<url>` - a link to the reduced test case
 >
@@ -57,6 +58,7 @@ Example:
 > merits).
 
 <a name="features"></a>
+
 ## Feature requests
 
 Feature requests are welcome. But take a moment to find out whether your idea
@@ -65,6 +67,7 @@ case to convince the project's developers of the merits of this feature. Please
 provide as much detail and context as possible.
 
 <a name="pull-requests"></a>
+
 ## Pull requests
 
 Good pull requests - patches, improvements, new features - are a fantastic

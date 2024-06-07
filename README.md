@@ -6,11 +6,12 @@ SSE is a client/server implementation for Server Sent Events for Golang.
 
 ## Build status
 
-* Master: [![CircleCI  Master](https://circleci.com/gh/r3labs/sse.svg?style=svg)](https://circleci.com/gh/r3labs/sse)
+- Master: [![CircleCI  Master](https://circleci.com/gh/r3labs/sse.svg?style=svg)](https://circleci.com/gh/r3labs/sse)
 
 ## Quick start
 
 To install:
+
 ```
 go get github.com/r3labs/sse/v2
 ```
@@ -48,7 +49,6 @@ Clients can connect to this stream once the http handler is started by specifyin
 ```
 http://server/events?stream=messages
 ```
-
 
 In order to start the http server:
 
@@ -166,7 +166,6 @@ func main() {
 	})
 }
 ```
-
 
 ## Contributing
 
