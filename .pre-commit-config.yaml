@@ -1,0 +1,115 @@
+
+# see: https://pre-commit.com/hooks.html
+
+
+repos:
+  - repo: https://github.com/pre-commit/mirrors-yapf
+    rev: v0.32.0
+    hooks:
+      - id: yapf
+        additional_dependencies: [toml]
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.4.0
+    hooks:
+      - id: check-case-conflict
+      - id: check-ast
+      - id: check-json
+      - id: check-yaml
+        exclude: |
+          (?x)^(
+             grid-backend/kube-manifests/.*|
+             grid-backend/kubernetes/grid/.*|
+             .*chart.*|
+             .*external_snapshotter.*|
+             .*yace.*|
+             .*templates/.*|
+             infra/security-hub-delegated-administrator-account/aws-config/cloudformation-stackset.yml
+           )$
+      - id: check-docstring-first
+      - id: check-merge-conflict
+      - id: check-symlinks
+      - id: detect-private-key
+        # TODO: revisit if all are still needed
+        exclude: |
+          (?x)^(
+            grid-backend/pkg/cli/grid-tools/migrations/testdata/staging-3-2021-12-03-refactored.tfstate|
+            grid-backend/pkg/cli/grid-tools/migrations/testdata/staging-3-2021-12-03.tfstate|
+            grid-backend/pkg/cluster/aws/tfmodule/dev.tfvars|
+            grid-backend/pkg/cluster/azure/tfmodule/neven.tfvars|
+            grid-backend/pkg/cluster/azure/tfmodule/variables.tf|
+            grid-backend/secrets/.*|
+            .*testdata.*|
+            grid-backend/tests/data/grid_bot_key|
+            grid-backend/tests/data/local-seed.sql|
+            grid-backend/tests/aws-same-cluster-on-prem/k3d_config.yaml|
+            grid-backend/tests/data/seed.sql|
+            grid-blueprint/terraform/.*/variables.tf|
+            grid-backend/tests/aws-same-cluster-on-prem/k3d_config.yaml|
+            grid-backend/scripts/grafana_provisioning/datasources/staging.yaml|
+            .*grid-cloud/variables.tf|
+            infra/staging/gh.yaml|
+            infra/ci-runners/action-runner-controller-values.yaml|
+            infra/security-hub-delegated-administrator-account/aws-config/cloudformation-stackset.yml
+          )$
+      - id: end-of-file-fixer
+        exclude: testdata
+      - id: requirements-txt-fixer
+      - id: mixed-line-ending
+      - id: pretty-format-json
+        args:
+          - "--autofix"
+        exclude: |
+          (?x)^(
+            vm-images/.*/variables.json|
+            vm-images/.*/deep-learning.json|
+            .*\.swagger\.json$|
+            .*testdata.*|
+            .*vscode/launch.json|
+            lightning-ui/src/.*\.ipynb.json
+          )$
+      - id: trailing-whitespace
+      # by default both master & main are prevented for committing to
+      #- id: no-commit-to-branch
+      - id: check-added-large-files
+
+  - repo: https://github.com/executablebooks/mdformat
+    rev: 0.7.16
+    hooks:
+      - id: mdformat
+        additional_dependencies:
+          - mdformat-gfm
+          - mdformat_frontmatter
+        exclude: |
+          (?x)^(
+            lightning-cloud/lightning_cloud/openapi/README.md
+          )$
+
+  - repo: https://github.com/tekwizely/pre-commit-golang
+    rev: v1.0.0-rc.1
+    hooks:
+      - id: go-fmt
+        args: ["-s", "-w"]
+      - id: go-imports
+        args: ["-w", "-local", "github.com/gridai"]
+
+  - repo: local
+    hooks:
+      - id: zap_labels_must_not_have_dash
+        name: Zap labels must not have a dash character in them. Use underscore characters.
+        description: 'All zap labels must not have - in them; use underscore'
+        entry: '(zap\.\w*\(\"[\w-]*)([-]+)(.*",.*\))'
+        language: pygrep
+        types: [go]
+      - id: zap_labels_must_not_have_space
+        name: Zap labels must not have space character in them. Use underscore characters.
+        description: 'All zap labels cannot have a space character in them; use underscore'
+        entry: '(zap\.\w*\(\"[\w\s]*)([\s]+)(.*\",.*\))'
+        language: pygrep
+        types: [go]
+      - id: ui_lint
+        name: ui_lint
+        description: Lint and fix (when possible) UI
+        entry: bash -c 'cd lightning-ui && yarn lint:fix'
+        language: system
+        files: ^lightning-ui/
+        exclude: ^lightning-ui/src/api/grid/openapi/
