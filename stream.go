@@ -5,6 +5,7 @@
 package sse
 
 import (
+	"fmt"
 	"net/url"
 	"sync"
 	"sync/atomic"
@@ -49,6 +50,15 @@ func newStream(id string, buffSize int, replay, isAutoStream bool, onSubscribe, 
 
 func (str *Stream) run() {
 	go func(str *Stream) {
+		defer func() {
+			if r := recover(); r != nil {
+				// NOTE: this recover makes sure the machine won't die on panic
+				// TODO (rob): We need to add logging capacity to server
+				// Handle the panic, e.g., log the error
+				fmt.Printf("Recovered from panic: %v\n", r)
+				// Optionally, you might want to restart the goroutine or take other actions
+			}
+		}()
 		for {
 			select {
 			// Add new subscriber

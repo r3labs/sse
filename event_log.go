@@ -5,6 +5,7 @@
 package sse
 
 import (
+	"fmt"
 	"strconv"
 	"time"
 )
@@ -30,8 +31,29 @@ func (e *EventLog) Clear() {
 
 // Replay events to a subscriber
 func (e *EventLog) Replay(s *Subscriber) {
+	// NOTE: we need to add proper logging capacity to the SSE server
+	// check that eventlog still exists
+	if e == nil {
+		// Log the error or handle it accordingly
+		fmt.Println("EventLog is nil")
+		return
+	}
+	// iterate events and send to subscriber
 	for i := 0; i < len(*e); i++ {
-		id, _ := strconv.Atoi(string((*e)[i].ID))
+		// check that event exists
+		if (*e)[i] == nil {
+			// Log the error or handle it accordingly
+			fmt.Printf("Event at index %d is nil\n", i)
+			continue
+		}
+		// get the event id
+		id, err := strconv.Atoi(string((*e)[i].ID))
+		if err != nil {
+			// Log the error or handle it accordingly
+			fmt.Println("Error converting event ID to int")
+			continue
+		}
+		// check if event id is greater than subscriber event id
 		if id >= s.eventid {
 			s.connection <- (*e)[i]
 		}
