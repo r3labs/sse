@@ -55,6 +55,8 @@ type Client struct {
 	mu                sync.Mutex
 	EncodingBase64    bool
 	Connected         bool
+	Body              io.Reader
+	Method            string
 }
 
 // NewClient creates a new client
@@ -289,7 +291,10 @@ func (c *Client) OnConnect(fn ConnCallback) {
 }
 
 func (c *Client) request(ctx context.Context, stream string) (*http.Response, error) {
-	req, err := http.NewRequest("GET", c.URL, nil)
+	if c.Method == "" {
+		c.Method = "GET"
+	}
+	req, err := http.NewRequest(c.Method, c.URL, c.Body)
 	if err != nil {
 		return nil, err
 	}
