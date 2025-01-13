@@ -55,6 +55,7 @@ type Client struct {
 	mu                sync.Mutex
 	EncodingBase64    bool
 	Connected         bool
+	Request           *http.Request
 }
 
 // NewClient creates a new client
@@ -292,6 +293,10 @@ func (c *Client) request(ctx context.Context, stream string) (*http.Response, er
 	req, err := http.NewRequest("GET", c.URL, nil)
 	if err != nil {
 		return nil, err
+	}
+	// Override request with provided request
+	if c.Request != nil {
+		req = c.Request
 	}
 	req = req.WithContext(ctx)
 
