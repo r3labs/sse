@@ -10,7 +10,7 @@ import (
 	"encoding/hex"
 	"net/http"
 	"net/http/httptest"
-	"runtime"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -400,25 +400,28 @@ func TestTrimHeader(t *testing.T) {
 	}
 }
 
+// Verify that cancelling the context really terminates the execution.
 func TestSubscribeWithContextDone(t *testing.T) {
 	setup(false)
 	defer cleanup()
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	var n1 = runtime.NumGoroutine()
+	var launched int32 = 10
+	var exited int32
 
 	c := NewClient(urlPath)
 
-	for i := 0; i < 10; i++ {
-		go c.SubscribeWithContext(ctx, "test", func(msg *Event) {})
+	for i := 0; i < int(launched); i++ {
+		go func() {
+			defer atomic.AddInt32(&exited, 1)
+			c.SubscribeWithContext(ctx, "test", func(msg *Event) {})
+		}()
 	}
 
-	time.Sleep(1 * time.Second)
+	time.Sleep(10 * time.Millisecond)
 	cancel()
 
-	time.Sleep(1 * time.Second)
-	var n2 = runtime.NumGoroutine()
-
-	assert.Equal(t, n1, n2)
+	time.Sleep(10 * time.Millisecond)
+	assert.Equal(t, launched, atomic.LoadInt32(&exited))
 }
