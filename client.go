@@ -100,7 +100,7 @@ func (c *Client) SubscribeWithContext(ctx context.Context, stream string, handle
 		reader := NewEventStreamReader(resp.Body, c.maxBufferSize)
 		eventChan, errorChan := c.startReadLoop(reader)
 
-		for {
+		for ctx.Err() == nil {
 			select {
 			case err = <-errorChan:
 				return err
@@ -108,6 +108,8 @@ func (c *Client) SubscribeWithContext(ctx context.Context, stream string, handle
 				handler(msg)
 			}
 		}
+
+		return ctx.Err()
 	}
 
 	// Apply user specified reconnection strategy or default to standard NewExponentialBackOff() reconnection method
