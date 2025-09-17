@@ -8,9 +8,26 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/base64"
+	"errors"
+	"fmt"
 	"io"
+	"net/http"
 	"time"
 )
+
+var (
+	headerID      = []byte("id:")
+	headerData    = []byte("data:")
+	headerEvent   = []byte("event:")
+	headerRetry   = []byte("retry:")
+	headerComment = []byte(":")
+)
+
+type EventParseConfig struct {
+	EncodingBase64 bool
+	Comments       bool
+}
 
 // Event holds all of the event source fields
 type Event struct {
@@ -22,8 +39,136 @@ type Event struct {
 	Comment   []byte
 }
 
+func ParseEvent(msg []byte, cfg EventParseConfig) (*Event, error) {
+	var e Event
+	var err error
+
+	if len(msg) < 1 {
+		return nil, errors.New("event message was empty")
+	}
+
+	// Normalize the crlf to lf to make it easier to split the lines.
+	// Split the line by "\n" or "\r", per the spec.
+	for _, line := range bytes.FieldsFunc(msg, func(r rune) bool { return r == '\n' || r == '\r' }) {
+		switch {
+		case bytes.HasPrefix(line, headerID):
+			e.ID = append([]byte(nil), trimHeader(len(headerID), line)...)
+		case bytes.HasPrefix(line, headerData):
+			// The spec allows for multiple data fields per event, concatenated them with "\n".
+			e.Data = append(e.Data[:], append(trimHeader(len(headerData), line), byte('\n'))...)
+		// The spec says that a line that simply contains the string "data" should be treated as a data field with an empty body.
+		case bytes.Equal(line, bytes.TrimSuffix(headerData, []byte(":"))):
+			e.Data = append(e.Data, byte('\n'))
+		case bytes.HasPrefix(line, headerEvent):
+			e.Event = append([]byte(nil), trimHeader(len(headerEvent), line)...)
+		case bytes.HasPrefix(line, headerRetry):
+			e.Retry = append([]byte(nil), trimHeader(len(headerRetry), line)...)
+		case cfg.Comments && bytes.HasPrefix(line, headerComment):
+			e.Comment = append([]byte(nil), trimHeader(len(headerComment), line)...)
+		default:
+			// Ignore any garbage that doesn't match what we're looking for.
+		}
+	}
+
+	// Trim the last "\n" per the spec.
+	e.Data = bytes.TrimSuffix(e.Data, []byte("\n"))
+
+	if cfg.EncodingBase64 {
+		buf := make([]byte, base64.StdEncoding.DecodedLen(len(e.Data)))
+
+		n, decodeErr := base64.StdEncoding.Decode(buf, e.Data)
+		if decodeErr != nil {
+			err = fmt.Errorf("failed to decode event message: %s", decodeErr)
+		}
+		e.Data = buf[:n]
+	}
+	return &e, err
+}
+
+func trimHeader(size int, data []byte) []byte {
+	if data == nil || len(data) < size {
+		return data
+	}
+
+	data = data[size:]
+	// Remove optional leading whitespace
+	if len(data) > 0 && data[0] == 32 {
+		data = data[1:]
+	}
+	// Remove trailing new line
+	if len(data) > 0 && data[len(data)-1] == 10 {
+		data = data[:len(data)-1]
+	}
+	return data
+}
+
+type EventWriteConfig struct {
+	SplitData bool
+}
+
+func (e *Event) Write(w io.Writer, cfg EventWriteConfig) (int, error) {
+	var nWritten int
+	writef := func(format string, a ...interface{}) error {
+		n, err := fmt.Fprintf(w, format, a...)
+		nWritten += n
+		return err
+	}
+
+	if len(e.Data) > 0 {
+		if err := writef("id: %s\n", e.ID); err != nil {
+			return nWritten, err
+		}
+
+		if cfg.SplitData {
+			sd := bytes.Split(e.Data, []byte("\n"))
+			for i := range sd {
+				if err := writef("data: %s\n", sd[i]); err != nil {
+					return nWritten, err
+				}
+				if flusher, ok := w.(http.Flusher); ok {
+					flusher.Flush()
+				}
+			}
+		} else {
+			if bytes.HasPrefix(e.Data, []byte(":")) {
+				if err := writef("%s\n", e.Data); err != nil {
+					return nWritten, err
+				}
+			} else {
+				if err := writef("data: %s\n", e.Data); err != nil {
+					return nWritten, err
+				}
+			}
+		}
+
+		if len(e.Event) > 0 {
+			if err := writef("event: %s\n", e.Event); err != nil {
+				return nWritten, err
+			}
+		}
+
+		if len(e.Retry) > 0 {
+			if err := writef("retry: %s\n", e.Retry); err != nil {
+				return nWritten, err
+			}
+		}
+	}
+
+	if len(e.Comment) > 0 {
+		if err := writef(": %s\n", e.Comment); err != nil {
+			return nWritten, err
+		}
+	}
+
+	return nWritten, nil
+}
+
 func (e *Event) hasContent() bool {
 	return len(e.ID) > 0 || len(e.Data) > 0 || len(e.Event) > 0 || len(e.Retry) > 0
+}
+
+func (e *Event) hasComment() bool {
+	return len(e.Comment) > 0
 }
 
 // EventStreamReader scans an io.Reader looking for EventStream messages.

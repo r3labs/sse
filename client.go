@@ -5,10 +5,7 @@
 package sse
 
 import (
-	"bytes"
 	"context"
-	"encoding/base64"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -19,16 +16,15 @@ import (
 	"gopkg.in/cenkalti/backoff.v1"
 )
 
-var (
-	headerID    = []byte("id:")
-	headerData  = []byte("data:")
-	headerEvent = []byte("event:")
-	headerRetry = []byte("retry:")
-)
-
 func ClientMaxBufferSize(s int) func(c *Client) {
 	return func(c *Client) {
 		c.maxBufferSize = s
+	}
+}
+
+func ClientWithComments() func(c *Client) {
+	return func(c *Client) {
+		c.EventParseConfig.Comments = true
 	}
 }
 
@@ -53,8 +49,8 @@ type Client struct {
 	LastEventID       atomic.Value // []byte
 	maxBufferSize     int
 	mu                sync.Mutex
-	EncodingBase64    bool
 	Connected         bool
+	EventParseConfig
 }
 
 // NewClient creates a new client
@@ -233,7 +229,7 @@ func (c *Client) readLoop(reader *EventStreamReader, outCh chan *Event, erChan c
 
 		// If we get an error, ignore it.
 		var msg *Event
-		if msg, err = c.processEvent(event); err == nil {
+		if msg, err = ParseEvent(event, c.EventParseConfig); err == nil {
 			if len(msg.ID) > 0 {
 				c.LastEventID.Store(msg.ID)
 			} else {
@@ -241,7 +237,7 @@ func (c *Client) readLoop(reader *EventStreamReader, outCh chan *Event, erChan c
 			}
 
 			// Send downstream if the event has something useful
-			if msg.hasContent() {
+			if msg.hasContent() || (c.EventParseConfig.Comments && msg.hasComment()) {
 				outCh <- msg
 			}
 		}
@@ -319,49 +315,6 @@ func (c *Client) request(ctx context.Context, stream string) (*http.Response, er
 	return c.Connection.Do(req)
 }
 
-func (c *Client) processEvent(msg []byte) (event *Event, err error) {
-	var e Event
-
-	if len(msg) < 1 {
-		return nil, errors.New("event message was empty")
-	}
-
-	// Normalize the crlf to lf to make it easier to split the lines.
-	// Split the line by "\n" or "\r", per the spec.
-	for _, line := range bytes.FieldsFunc(msg, func(r rune) bool { return r == '\n' || r == '\r' }) {
-		switch {
-		case bytes.HasPrefix(line, headerID):
-			e.ID = append([]byte(nil), trimHeader(len(headerID), line)...)
-		case bytes.HasPrefix(line, headerData):
-			// The spec allows for multiple data fields per event, concatenated them with "\n".
-			e.Data = append(e.Data[:], append(trimHeader(len(headerData), line), byte('\n'))...)
-		// The spec says that a line that simply contains the string "data" should be treated as a data field with an empty body.
-		case bytes.Equal(line, bytes.TrimSuffix(headerData, []byte(":"))):
-			e.Data = append(e.Data, byte('\n'))
-		case bytes.HasPrefix(line, headerEvent):
-			e.Event = append([]byte(nil), trimHeader(len(headerEvent), line)...)
-		case bytes.HasPrefix(line, headerRetry):
-			e.Retry = append([]byte(nil), trimHeader(len(headerRetry), line)...)
-		default:
-			// Ignore any garbage that doesn't match what we're looking for.
-		}
-	}
-
-	// Trim the last "\n" per the spec.
-	e.Data = bytes.TrimSuffix(e.Data, []byte("\n"))
-
-	if c.EncodingBase64 {
-		buf := make([]byte, base64.StdEncoding.DecodedLen(len(e.Data)))
-
-		n, err := base64.StdEncoding.Decode(buf, e.Data)
-		if err != nil {
-			err = fmt.Errorf("failed to decode event message: %s", err)
-		}
-		e.Data = buf[:n]
-	}
-	return &e, err
-}
-
 func (c *Client) cleanup(ch chan *Event) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -370,21 +323,4 @@ func (c *Client) cleanup(ch chan *Event) {
 		close(c.subscribed[ch])
 		delete(c.subscribed, ch)
 	}
-}
-
-func trimHeader(size int, data []byte) []byte {
-	if data == nil || len(data) < size {
-		return data
-	}
-
-	data = data[size:]
-	// Remove optional leading whitespace
-	if len(data) > 0 && data[0] == 32 {
-		data = data[1:]
-	}
-	// Remove trailing new line
-	if len(data) > 0 && data[len(data)-1] == 10 {
-		data = data[:len(data)-1]
-	}
-	return data
 }
