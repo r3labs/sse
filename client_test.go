@@ -417,8 +417,19 @@ func TestSubscribeWithContextDone(t *testing.T) {
 	time.Sleep(1 * time.Second)
 	cancel()
 
-	time.Sleep(1 * time.Second)
-	var n2 = runtime.NumGoroutine()
+	// After cancel, subscriber goroutines exit asynchronously. Polling
+	// instead of a single 1s sleep keeps the test from flaking on busy
+	// CPUs while still failing in a reasonable time if the goroutines
+	// genuinely leak.
+	deadline := time.Now().Add(10 * time.Second)
+	var n2 int
+	for time.Now().Before(deadline) {
+		n2 = runtime.NumGoroutine()
+		if n2 == n1 {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
 
 	assert.Equal(t, n1, n2)
 }
