@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -421,4 +422,127 @@ func TestSubscribeWithContextDone(t *testing.T) {
 	var n2 = runtime.NumGoroutine()
 
 	assert.Equal(t, n1, n2)
+}
+
+func TestProcessEventID(t *testing.T) {
+	tests := []struct {
+		name   string
+		fields string
+		want   []byte
+	}{
+		{name: "absent"},
+		{name: "empty", fields: "id:\n", want: []byte{}},
+		{name: "empty with space", fields: "id: \n", want: []byte{}},
+		{name: "bare field", fields: "id\n", want: []byte{}},
+		{name: "empty after value", fields: "id: previous\nid:\n", want: []byte{}},
+		{name: "bare field after value", fields: "id: previous\nid\n", want: []byte{}},
+		{name: "value after empty", fields: "id:\nid: next\n", want: []byte("next")},
+		{name: "one space remains", fields: "id:  \n", want: []byte(" ")},
+		{name: "trailing space remains", fields: "id: next \n", want: []byte("next ")},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			event, err := NewClient("").processEvent([]byte(tc.fields + "data: message"))
+			require.NoError(t, err)
+			require.Equal(t, tc.want, event.ID)
+			require.Equal(t, []byte("message"), event.Data)
+		})
+	}
+}
+
+func TestClientLastEventID(t *testing.T) {
+	tests := []struct {
+		name    string
+		initial string
+		stream  string
+		wantIDs []string
+		wantID  string
+	}{
+		{
+			name: "empty field", initial: "previous",
+			stream: "id:\ndata: reset\n\ndata: following\n\n", wantIDs: []string{"", ""},
+		},
+		{
+			name: "empty field with space", initial: "previous",
+			stream: "id: \ndata: reset\n\ndata: following\n\n", wantIDs: []string{"", ""},
+		},
+		{
+			name: "bare field", initial: "previous",
+			stream: "id\ndata: reset\n\ndata: following\n\n", wantIDs: []string{"", ""},
+		},
+		{
+			name: "absent field inherits", initial: "previous",
+			stream: "data: first\n\ndata: following\n\n", wantIDs: []string{"previous", "previous"}, wantID: "previous",
+		},
+		{
+			name: "last field clears", initial: "previous",
+			stream: "id: next\nid:\ndata: reset\n\n", wantIDs: []string{""},
+		},
+		{
+			name: "last field assigns", initial: "previous",
+			stream: "id:\nid: next\ndata: updated\n\ndata: following\n\n", wantIDs: []string{"next", "next"}, wantID: "next",
+		},
+		{
+			name: "control only reset", initial: "previous",
+			stream: "id:\n\ndata: following\n\n", wantIDs: []string{""},
+		},
+		{
+			name: "control only reset without data", initial: "previous",
+			stream: "id:\n\n", wantIDs: []string{},
+		},
+		{
+			name:   "absent initial cursor",
+			stream: "data: message\n\n", wantIDs: []string{""},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			headers := make(chan http.Header, 1)
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				headers <- r.Header
+				w.WriteHeader(http.StatusNoContent)
+			}))
+			defer server.Close()
+			client := NewClient(server.URL)
+			if tc.initial != "" {
+				client.LastEventID.Store([]byte(tc.initial))
+			}
+			out := make(chan *Event, 4)
+			errors := make(chan error, 1)
+			client.readLoop(NewEventStreamReader(strings.NewReader(tc.stream), 1024), out, errors)
+			require.NoError(t, <-errors)
+			close(out)
+			ids := []string{}
+			for event := range out {
+				assert.NotEmpty(t, event.Data)
+				ids = append(ids, string(event.ID))
+			}
+			assert.Equal(t, tc.wantIDs, ids)
+			id, _ := client.LastEventID.Load().([]byte)
+			assert.Equal(t, tc.wantID, string(id))
+			response, err := client.request(context.Background(), "")
+			require.NoError(t, err)
+			require.NoError(t, response.Body.Close())
+			received := <-headers
+			assert.Equal(t, tc.wantID, received.Get("Last-Event-ID"))
+			_, present := received["Last-Event-Id"]
+			assert.Equal(t, tc.wantID != "", present)
+		})
+	}
+}
+
+func TestClientRequestEmptyLastEventID(t *testing.T) {
+	headers := make(chan http.Header, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		headers <- r.Header
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+	client := NewClient(server.URL)
+	client.LastEventID.Store([]byte{})
+	response, err := client.request(context.Background(), "")
+	require.NoError(t, err)
+	require.NoError(t, response.Body.Close())
+	_, present := (<-headers)["Last-Event-Id"]
+	assert.False(t, present)
 }

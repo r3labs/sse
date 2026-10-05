@@ -234,7 +234,7 @@ func (c *Client) readLoop(reader *EventStreamReader, outCh chan *Event, erChan c
 		// If we get an error, ignore it.
 		var msg *Event
 		if msg, err = c.processEvent(event); err == nil {
-			if len(msg.ID) > 0 {
+			if msg.ID != nil {
 				c.LastEventID.Store(msg.ID)
 			} else {
 				msg.ID, _ = c.LastEventID.Load().([]byte)
@@ -307,7 +307,7 @@ func (c *Client) request(ctx context.Context, stream string) (*http.Response, er
 	req.Header.Set("Connection", "keep-alive")
 
 	lastID, exists := c.LastEventID.Load().([]byte)
-	if exists && lastID != nil {
+	if exists && len(lastID) > 0 {
 		req.Header.Set("Last-Event-ID", string(lastID))
 	}
 
@@ -331,7 +331,9 @@ func (c *Client) processEvent(msg []byte) (event *Event, err error) {
 	for _, line := range bytes.FieldsFunc(msg, func(r rune) bool { return r == '\n' || r == '\r' }) {
 		switch {
 		case bytes.HasPrefix(line, headerID):
-			e.ID = append([]byte(nil), trimHeader(len(headerID), line)...)
+			e.ID = append([]byte{}, trimHeader(len(headerID), line)...)
+		case bytes.Equal(line, bytes.TrimSuffix(headerID, []byte(":"))):
+			e.ID = []byte{}
 		case bytes.HasPrefix(line, headerData):
 			// The spec allows for multiple data fields per event, concatenated them with "\n".
 			e.Data = append(e.Data[:], append(trimHeader(len(headerData), line), byte('\n'))...)
